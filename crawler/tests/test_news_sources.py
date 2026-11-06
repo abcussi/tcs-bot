@@ -191,7 +191,13 @@ def test_local_inbox_reads_supported_files(tmp_path):
     inbox = LocalInbox(tmp_path)
     docs = inbox.search("ignored", None)
     names = [d.url.rsplit("/", 1)[-1] for d in docs]
-    assert names == ["a_note.txt", "b_page.html", "synthetic-statement", "d_memo.md", "e_report.pdf"]
+    assert names == [
+        "a_note.txt",
+        "b_page.html",
+        "synthetic-statement",
+        "d_memo.md",
+        "e_report.pdf",
+    ]
     by = {n: d for n, d in zip(names, docs, strict=True)}
     assert by["a_note.txt"].url.startswith("file://") and by["a_note.txt"].source == "local_inbox"
     assert by["a_note.txt"].source_type == "other" and by["a_note.txt"].depth == 0

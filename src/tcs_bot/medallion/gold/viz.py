@@ -896,4 +896,4 @@ fit(); runSim(alpha);
 </script>
 </body>
 </html>
-"""
+"""  # noqa: E501

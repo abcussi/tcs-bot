@@ -150,8 +150,7 @@ def search_risks(
     except Exception as exc:
         log.error("gold.search_failed", error_type=type(exc).__name__)
         raise DependencyUnavailable(
-            f"Qdrant search failed ({type(exc).__name__}); is Qdrant up and gold built? "
-            f"{RUN_HINT}",
+            f"Qdrant search failed ({type(exc).__name__}); is Qdrant up and gold built? {RUN_HINT}",
             code="qdrant_unavailable",
         ) from exc
     if dedupe:

@@ -41,7 +41,9 @@ def cosine_matrix(X: np.ndarray) -> np.ndarray:
 
 
 def top_neighbors(S: np.ndarray, k: int) -> np.ndarray:
-    """``(n, min(k, n-1))`` indices of each row's most similar *other* rows (desc, ties by index)."""
+    """Indices ``(n, min(k, n-1))`` of each row's most similar *other* rows.
+
+    Sorted by cosine desc, ties by index asc (deterministic)."""
     n = S.shape[0]
     k = max(0, min(k, n - 1))
     if k == 0:

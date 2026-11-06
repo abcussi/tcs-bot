@@ -38,7 +38,7 @@ SUMMARY_MAX_CHARS = 600
 _WORD = re.compile(r"\w+")
 _BOILERPLATE = re.compile(
     r"\b(?:cookies?|subscribe|sign in|log in|newsletter|all rights reserved|click here|"
-    r"advertisement|privacy policy|terms of (?:use|service)|javascript)\b|SYNTHETIC FIXTURE",
+    r"advertisement|privacy policy|terms of (?:use|service)|javascript)\b",
     re.IGNORECASE,
 )
 _EN_STOP = frozenset(

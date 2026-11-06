@@ -16,9 +16,7 @@ from gfinance_crawler.news.models import FetchResult
 
 log = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (compatible; VendorRiskBot/0.1; TCS vendor-risk research crawler)"
-)
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; VendorRiskBot/0.1; TCS vendor-risk research crawler)"
 ROBOTS_AGENT = "VendorRiskBot"
 BLOCKED_STATUSES = {401, 403, 451}
 MAX_TEXT_CHARS = 2_000_000  # bronze column is MEDIUMTEXT (16 MiB of utf8mb4)

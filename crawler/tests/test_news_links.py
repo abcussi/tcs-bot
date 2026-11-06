@@ -58,7 +58,10 @@ def test_extract_links_resolves_dedupes_and_skips_non_http():
         in urls
     )
     anchors = dict(links)
-    assert anchors["https://www.financialexpress.com/money/lrs-rules/"] == "TCS on LRS remittance rules"
+    assert (
+        anchors["https://www.financialexpress.com/money/lrs-rules/"]
+        == "TCS on LRS remittance rules"
+    )
     dup = extract_links('<a href="/a?utm_source=1">x</a><a href="/a">y</a>', "https://h.com/")
     assert dup == [("https://h.com/a?utm_source=1", "x")]
     assert extract_links("", "https://h.com") == []
@@ -69,9 +72,7 @@ def test_extract_links_json_finds_url_fields_and_html_anchors():
     urls = [u for u, _ in links]
     assert urls[0] == "https://www.reuters.com/technology/tcs-synthetic-data-breach-2026-11-01/"
     assert links[0][1] == "SYNTHETIC: TCS data breach discussion"
-    assert (
-        "https://www.business-standard.com/companies/tcs-synthetic-security-review.html" in urls
-    )
+    assert "https://www.business-standard.com/companies/tcs-synthetic-security-review.html" in urls
     assert extract_links_json("not json") == []
 
 

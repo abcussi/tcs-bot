@@ -12,7 +12,10 @@ from tcs_bot.medallion.models import RISK_CATEGORIES, GoldHit
 from tcs_bot.schemas.api import ErrorEnvelope
 
 _ERRORS: dict[int | str, dict[str, Any]] = {
-    404: {"model": ErrorEnvelope, "description": "Gold not built yet (run `tcs-bot medallion run`)"},
+    404: {
+        "model": ErrorEnvelope,
+        "description": "Gold not built yet (run `tcs-bot medallion run`)",
+    },
     422: {"model": ErrorEnvelope, "description": "Validation error"},
     503: {"model": ErrorEnvelope, "description": "Qdrant / embedder unavailable"},
 }

@@ -155,7 +155,7 @@ def test_transaction_rollback_leaves_no_rows(migrated_db):
 # --------------------------------------------------------------------------- migrate
 def test_migrate_creates_all_tables_then_is_idempotent(empty_db):
     """AC-001.3/4: first run creates every table + version row; second run is a no-op."""
-    expected = [name for name, _ in migrate_mod.load_statements()]
+    expected = [name for name, _ in migrate_mod.all_statements()]  # 001 + 002 (spec 005)
     with capture_logs():
         assert migrate() == expected
         assert migrate() == []

@@ -1,17 +1,23 @@
-"""Schema migration (AC-001.3, AC-001.4).
+"""Versioned schema migrations (AC-001.3, AC-001.4, AC-005.4).
+
+Migrations are applied in order (:data:`MIGRATIONS`): ``001_initial`` = ``schema.sql`` (spec 001),
+``002_medallion`` = ``schema_002_medallion.sql`` (spec 005 bronze: ``crawl_runs``,
+``bronze_documents``). Each SQL file may only contain ``CREATE TABLE IF NOT EXISTS`` statements.
 
 Caveat — MySQL DDL is *not* transactional
 -----------------------------------------
 Every ``CREATE TABLE`` causes an implicit COMMIT in MySQL, so a classic BEGIN/ROLLBACK cannot undo
-a half-applied schema. ``migrate()`` therefore implements one *logical* transaction:
+a half-applied schema. Each migration version is therefore one *logical* transaction:
 
 1. record the tables that already exist,
-2. execute each ``CREATE TABLE IF NOT EXISTS`` from ``schema.sql`` in order,
+2. execute each ``CREATE TABLE IF NOT EXISTS`` of that version in order,
 3. insert the version row into ``schema_migrations``,
 4. on ANY failure, run a compensating ``DROP TABLE`` (reverse order) for every table created
-   *in this run* — pre-existing tables are never touched — and re-raise.
+   *by this version in this run* — pre-existing tables and earlier, already-recorded versions are
+   never touched — and re-raise (later versions are not attempted).
 
-It is idempotent: if the version is recorded and every table exists, it is a no-op returning ``[]``.
+It is idempotent: a version that is recorded and whose tables all exist is skipped; when every
+version is skipped ``migrate()`` is a no-op returning ``[]``.
 """
 
 from __future__ import annotations
@@ -25,12 +31,19 @@ from tcs_bot.logging_setup import get_logger
 
 log = get_logger(__name__)
 
-SCHEMA_VERSION = "001_initial"
+SCHEMA_VERSION = "001_initial"  # the base schema (schema.sql)
+#: ``(version, sql file in tcs_bot.db)`` in apply order.
+MIGRATIONS: list[tuple[str, str]] = [
+    (SCHEMA_VERSION, "schema.sql"),
+    ("002_medallion", "schema_002_medallion.sql"),
+]
+LATEST_VERSION = MIGRATIONS[-1][0]
 _CREATE_RE = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?", re.IGNORECASE)
 
 
 def load_statements(sql: str | None = None) -> list[tuple[str, str]]:
-    """Parse ``schema.sql`` into ``[(table_name, statement), ...]`` (comments stripped)."""
+    """Parse a schema file (default ``schema.sql``) into ``[(table_name, statement), ...]``
+    (comments stripped)."""
     if sql is None:
         sql = resources.files("tcs_bot.db").joinpath("schema.sql").read_text("utf-8")
     body = "\n".join(line for line in sql.splitlines() if not line.strip().startswith("--"))
@@ -48,6 +61,23 @@ def load_statements(sql: str | None = None) -> list[tuple[str, str]]:
     return out
 
 
+def _read_sql(filename: str) -> str:
+    return resources.files("tcs_bot.db").joinpath(filename).read_text("utf-8")
+
+
+def statements_for(version: str) -> list[tuple[str, str]]:
+    """Statements of one migration version (``001`` goes through :func:`load_statements`)."""
+    filename = dict(MIGRATIONS)[version]
+    if version == SCHEMA_VERSION:
+        return load_statements()
+    return load_statements(_read_sql(filename))
+
+
+def all_statements() -> list[tuple[str, str]]:
+    """Every migration's statements, in apply order."""
+    return [st for version, _ in MIGRATIONS for st in statements_for(version)]
+
+
 def _existing_tables(cur: Any) -> set[str]:
     cur.execute(
         "SELECT TABLE_NAME AS table_name FROM information_schema.TABLES "
@@ -56,20 +86,26 @@ def _existing_tables(cur: Any) -> set[str]:
     return {str(row["table_name"]) for row in cur.fetchall()}
 
 
-def _version_applied(cur: Any) -> bool:
-    cur.execute("SELECT version FROM schema_migrations WHERE version = %s", (SCHEMA_VERSION,))
+def _version_applied(cur: Any, version: str = SCHEMA_VERSION) -> bool:
+    cur.execute("SELECT version FROM schema_migrations WHERE version = %s", (version,))
     return cur.fetchone() is not None
 
 
 def migrate() -> list[str]:
-    """Create all tables; return the names of tables created in this run (``[]`` if no-op)."""
-    statements = load_statements()
+    """Apply every pending migration; return the tables created in this run (``[]`` if no-op)."""
+    created: list[str] = []
+    for version, _ in MIGRATIONS:
+        created.extend(_apply(version, statements_for(version)))
+    return created
+
+
+def _apply(version: str, statements: list[tuple[str, str]]) -> list[str]:
     wanted = [name for name, _ in statements]
     created: list[str] = []
     with transaction() as cur:
         existing = _existing_tables(cur)
-        if set(wanted) <= existing and _version_applied(cur):
-            log.info("db.migrate.noop", version=SCHEMA_VERSION)
+        if set(wanted) <= existing and _version_applied(cur, version):
+            log.info("db.migrate.noop", version=version)
             return []
         try:
             for name, stmt in statements:
@@ -79,13 +115,13 @@ def migrate() -> list[str]:
             cur.execute(
                 "INSERT IGNORE INTO schema_migrations (version, applied_at) "
                 "VALUES (%s, UTC_TIMESTAMP())",
-                (SCHEMA_VERSION,),
+                (version,),
             )
         except Exception as exc:
-            log.error("db.migrate.failed", version=SCHEMA_VERSION, error=str(exc), created=created)
+            log.error("db.migrate.failed", version=version, error=str(exc), created=created)
             _compensate(cur, created)
             raise
-    log.info("db.migrate.applied", version=SCHEMA_VERSION, created=created)
+    log.info("db.migrate.applied", version=version, created=created)
     return created
 
 

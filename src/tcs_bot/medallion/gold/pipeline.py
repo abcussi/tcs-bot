@@ -142,9 +142,7 @@ def build_graph_json(
         {"source": u, "target": v, "cosine": round(d["cosine"], 4), "mutual": bool(d["mutual"])}
         for u, v, d in G.edges(data=True)
     ]
-    synthetic = any(
-        "synthetic" in f"{r.extractor} {r.source} {r.domain}".lower() for r in records
-    )
+    synthetic = any("synthetic" in f"{r.extractor} {r.source} {r.domain}".lower() for r in records)
     meta = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "embedding_model": embedding_model,

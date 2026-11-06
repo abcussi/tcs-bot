@@ -20,6 +20,7 @@ except ImportError:  # mcp >= 2 renamed FastMCP -> MCPServer (same decorator API
     from mcp.server.mcpserver.exceptions import ToolError
 
 from tcs_bot.errors import AppError
+from tcs_bot.medallion.models import GoldHit
 from tcs_bot.schemas.api import ReportRequest, VendorOut
 from tcs_bot.schemas.report import RiskReport
 
@@ -30,7 +31,9 @@ mcp = FastMCP(
     "vendor-risk",
     instructions=(
         "Generate structured third-party (vendor) risk reports for capital-markets firms. "
-        "Call list_vendors to find a vendor, then generate_vendor_risk_report."
+        "Call list_vendors to find a vendor, then generate_vendor_risk_report. "
+        "For TCS (Tata Consultancy Services) risk intelligence from news and communities use "
+        "search_tcs_risks and tcs_risk_summary."
     ),
 )
 

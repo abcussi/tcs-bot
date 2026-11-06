@@ -292,8 +292,6 @@ _LEADING_NOISE = {
     "Friday",
     "Saturday",
     "Sunday",
-    "SYNTHETIC",
-    "FIXTURE",
 }
 
 _KNOWN_PEOPLE: dict[str, str] = {

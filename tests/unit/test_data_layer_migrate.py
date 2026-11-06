@@ -12,6 +12,8 @@ from tcs_bot.db import migrate as migrate_mod
 from tcs_bot.db import mysql as mysql_mod
 
 TABLES = [name for name, _ in migrate_mod.load_statements()]
+MEDALLION_TABLES = [name for name, _ in migrate_mod.statements_for("002_medallion")]
+ALL_TABLES = TABLES + MEDALLION_TABLES
 
 
 class FakeCursor:
@@ -98,17 +100,63 @@ def test_fresh_migrate_returns_created_and_records_version(monkeypatch):
     cur = FakeCursor()
     _patch_tx(monkeypatch, cur)
     with capture_logs():
-        assert migrate_mod.migrate() == TABLES
-    assert any("INSERT IGNORE INTO schema_migrations" in s for s in cur.executed)
+        assert migrate_mod.migrate() == ALL_TABLES  # 001 then 002 (spec 005)
+    assert sum("INSERT IGNORE INTO schema_migrations" in s for s in cur.executed) == 2
 
 
 def test_second_run_is_noop(monkeypatch):
     """AC-001.4: all tables + version present -> no DDL, returns []."""
-    cur = FakeCursor(existing=set(TABLES), version_applied=True)
+    cur = FakeCursor(existing=set(ALL_TABLES), version_applied=True)
     _patch_tx(monkeypatch, cur)
     with capture_logs():
         assert migrate_mod.migrate() == []
     assert cur.creates == 0
+
+
+# --------------------------------------------------------------------------- versioned (spec 005)
+def test_medallion_migration_tables_and_order():
+    """AC-005.4: migration 002 adds crawl_runs then bronze_documents (FK order), after 001."""
+    assert [v for v, _ in migrate_mod.MIGRATIONS] == ["001_initial", "002_medallion"]
+    assert migrate_mod.LATEST_VERSION == "002_medallion"
+    assert MEDALLION_TABLES == ["crawl_runs", "bronze_documents"]
+    ddl = dict(migrate_mod.statements_for("002_medallion"))["bronze_documents"]
+    for needle in (
+        "UNIQUE KEY uq_bronze_documents_url_sha (url_sha256)",
+        "silver_processed_at",
+        "ix_bronze_documents_run",
+        "ix_bronze_documents_source",
+        "ENGINE=InnoDB",
+        "utf8mb4",
+        "ENUM('news','community','corporate','other')",
+        "MEDIUMTEXT",
+    ):
+        assert needle in ddl, needle
+
+
+def test_001_applied_only_002_runs(monkeypatch):
+    """AC-001.4/AC-005.4: an existing 001 database only gets the 002 tables."""
+
+    class Cur(FakeCursor):
+        def execute(self, sql, params=None):
+            super().execute(sql, params)
+            if sql.lstrip().upper().startswith("SELECT VERSION"):
+                self._result = [{"version": "x"}] if params == ("001_initial",) else []
+
+    cur = Cur(existing=set(TABLES))
+    _patch_tx(monkeypatch, cur)
+    with capture_logs():
+        assert migrate_mod.migrate() == MEDALLION_TABLES
+    assert cur.creates == len(MEDALLION_TABLES)
+
+
+def test_failure_in_002_compensates_only_002(monkeypatch):
+    """AC-001.3 semantics per version: a failing 002 DDL drops only what 002 created."""
+    cur = FakeCursor(fail_on_create=len(TABLES) + 2)  # 2nd CREATE of migration 002
+    _patch_tx(monkeypatch, cur)
+    with capture_logs(), pytest.raises(mysql_errors.ProgrammingError):
+        migrate_mod.migrate()
+    assert cur.drops == ["DROP TABLE IF EXISTS `crawl_runs`"]
+    assert sum("INSERT IGNORE INTO schema_migrations" in s for s in cur.executed) == 1
 
 
 # --------------------------------------------------------------------------- transaction()

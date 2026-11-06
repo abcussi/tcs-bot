@@ -3,7 +3,7 @@
 Every source turns one query into depth-0 ``RawDocument``s whose ``raw_content`` is the raw item
 (an RSS ``<item>`` XML snippet or the item's JSON) and whose ``follow_url`` is where depth 1 lives.
 Sources fetch through a shared :class:`PoliteFetcher` (robots, delay, retries) and raise
-:class:`SearchError` when the endpoint is blocked or fails, so the crawler can record it and move on.
+:class:`SearchError` when the endpoint is blocked or fails, so the crawler records it and moves on.
 
 Depth-0 ``url`` is the item's identity inside the source (Google News article link, Bing
 ``apiclick`` link, HN/Reddit permalink). GDELT has no item permalink, so its depth-0 url is the
