@@ -28,6 +28,6 @@ COPY --chown=app:app data ./data
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 API_HOST=0.0.0.0 API_PORT=8000
 USER app
 EXPOSE 8000
-HEALTHCHECK --interval=15s --timeout=5s --retries=5 CMD curl -fs http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 CMD curl -fs http://localhost:8000/health || exit 1
 # migrate + seed + index are idempotent, then serve
 CMD ["sh", "-c", "vendor-risk-ai migrate && vendor-risk-ai seed && vendor-risk-ai index && vendor-risk-ai api"]
