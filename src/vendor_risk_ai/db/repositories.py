@@ -201,6 +201,21 @@ class DocumentRepository:
                 cur.execute("DELETE FROM document_chunks WHERE document_id = %s", (document_id,))
         return len(chunks)
 
+    def chunk_ids_for_vendor(self, vendor_id: int) -> list[tuple[int, int]]:
+        """``(document_id, chunk_index)`` of every chunk of the vendor — no text, no embeddings.
+
+        Cheap input for the report cache key (AC-003.8) and "already chunked?" checks.
+        """
+        with transaction() as cur:
+            cur.execute(
+                "SELECT c.document_id, c.chunk_index FROM document_chunks c "
+                "JOIN vendor_documents d ON d.id = c.document_id "
+                "WHERE d.vendor_id = %s ORDER BY c.document_id, c.chunk_index",
+                (vendor_id,),
+            )
+            rows = cur.fetchall()
+        return [(int(r["document_id"]), int(r["chunk_index"])) for r in rows]
+
     def chunks_for_vendor(self, vendor_id: int) -> list[ChunkRecord]:
         with transaction() as cur:
             cur.execute(
