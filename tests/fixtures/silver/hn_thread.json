@@ -1,0 +1,25 @@
+{
+  "id": 990001,
+  "type": "story",
+  "author": "fictional_hn_user",
+  "title": "TCS outage takes down fictional retailer systems (SYNTHETIC FIXTURE)",
+  "url": "https://news.example.com/fictional-outage",
+  "text": null,
+  "children": [
+    {
+      "id": 990002,
+      "type": "comment",
+      "author": "fictional_commenter",
+      "text": "<p>SYNTHETIC FIXTURE: fictional comment. Outsourcing the whole service desk to TCS was the risk here.</p><p>The outage lasted three days &amp; nobody had a runbook.</p>",
+      "children": [
+        {
+          "id": 990003,
+          "type": "comment",
+          "author": "another_fictional_commenter",
+          "text": "Contract termination is likely after this.",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

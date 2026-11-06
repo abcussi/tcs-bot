@@ -1,0 +1,25 @@
+{
+  "_comment": "SYNTHETIC FIXTURE: fictional sentences written for unit tests of the silver rules classifier. None of these describe real events.",
+  "cases": [
+    {"id": "ethics", "category": "ethics", "min_severity": "critical", "title": "Fictional scenario: TCS manager accused of bribery",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a TCS project manager was accused of paying a bribe to win a public tender. The fictional complaint alleges corruption in the bidding process."},
+    {"id": "compliance", "category": "compliance_regulatory", "min_severity": "high", "title": "Fictional scenario: SEBI probe into TCS disclosures",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario SEBI opened a probe into TCS disclosures. The regulator could impose a penalty of Rs 50 crore."},
+    {"id": "legal", "category": "legal_litigation", "min_severity": "high", "title": "Fictional scenario: jury verdict against TCS in trade secrets case",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a jury returned a verdict against TCS in a trade secrets lawsuit filed by a fictional software maker. The court will hear post-trial motions next month."},
+    {"id": "cyber", "category": "data_privacy_cyber", "min_severity": "critical", "title": "Fictional scenario: ransomware hits TCS client",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a ransomware attack through a TCS-managed help desk led to a data breach at a fictional retailer."},
+    {"id": "labor", "category": "labor_hr", "min_severity": "high", "title": "Fictional scenario: TCS layoffs spark discrimination claims",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario TCS announced layoffs of senior staff. Former employees allege age discrimination and say they were forced to resign."},
+    {"id": "financial", "category": "financial", "min_severity": "medium", "title": "Fictional scenario: TCS cuts guidance",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario TCS issued a profit warning as margins declined for a third quarter. Shares fell 5% after the announcement."},
+    {"id": "operational", "category": "operational_delivery", "min_severity": "high", "title": "Fictional scenario: client terminates TCS contract after outage",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a fictional insurer terminated its contract with TCS after a week-long outage of its claims platform."},
+    {"id": "reputational", "category": "reputational", "min_severity": "medium", "title": "Fictional scenario: backlash over TCS advert",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a TCS advertising campaign triggered a social media backlash and calls for a boycott."},
+    {"id": "esg", "category": "esg", "min_severity": "medium", "title": "Fictional scenario: TCS accused of greenwashing",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario activists accused TCS of greenwashing because data-centre emissions rose while net-zero claims were repeated."},
+    {"id": "geopolitical", "category": "geopolitical_immigration", "min_severity": "high", "title": "Fictional scenario: TCS named in visa fraud complaint",
+     "text": "SYNTHETIC FIXTURE: fictional test text. In this invented scenario a complaint accused TCS of visa fraud in H-1B filings. New tariffs on services were also discussed."}
+  ]
+}

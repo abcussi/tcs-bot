@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC FIXTURE: fictional Google-News-style RSS item written for unit tests. -->
+<rss version="2.0">
+  <channel>
+    <title>"TCS" - Example News</title>
+    <item>
+      <title>TCS faces fictional lawsuit over trade secrets - Example Daily</title>
+      <link>https://news.example.com/articles/fictional-1</link>
+      <description>&lt;a href="https://news.example.com/articles/fictional-1"&gt;SYNTHETIC FIXTURE: a fictional software firm sued TCS in an invented trade secrets lawsuit&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Example Daily&lt;/font&gt;</description>
+      <pubDate>Mon, 02 Nov 2026 10:00:00 GMT</pubDate>
+      <source url="https://news.example.com">Example Daily</source>
+    </item>
+  </channel>
+</rss>

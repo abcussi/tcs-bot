@@ -1,0 +1,53 @@
+[
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t3",
+          "data": {
+            "title": "TCS bench policy and forced resignations? (SYNTHETIC FIXTURE)",
+            "selftext": "SYNTHETIC FIXTURE: fictional post written for unit tests. People on the TCS bench say HR asked them to resign after 35 days without a project.",
+            "author": "fictional_user_one",
+            "subreddit": "ExampleITCareers",
+            "score": 120
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t1",
+          "data": {
+            "author": "fictional_user_two",
+            "body": "Same here, my appraisal was delayed and the work-life balance in my TCS account is toxic.",
+            "replies": {
+              "kind": "Listing",
+              "data": {
+                "children": [
+                  {
+                    "kind": "t1",
+                    "data": {
+                      "author": "fictional_user_three",
+                      "body": "Forced resignation is illegal, talk to the labour department.",
+                      "replies": ""
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "kind": "t1",
+          "data": {"author": "[deleted]", "body": "[deleted]", "replies": ""}
+        },
+        {"kind": "more", "data": {"count": 12, "children": ["abc", "def"]}}
+      ]
+    }
+  }
+]
