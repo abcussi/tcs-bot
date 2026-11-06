@@ -1,0 +1,1 @@
+- [ ] config, models, scraper(+fixture), sink, run(once/schedule), crontab, Dockerfile, tests
