@@ -37,3 +37,7 @@
       (throwaway `silver-test-<uuid>` index, deleted after).
 - Note: `llm_extract(doc, text, settings, base=None, chain=None)` takes the extracted text
   explicitly (plan listed `llm_extract(doc, settings)`).
+
+## Verification log
+- SILVER verified by lead (lint clean; 68 unit + 2 integration tests pass against live ES).
+  Not yet run against real bronze rows: `bronze_documents` needs migration 002 applied.

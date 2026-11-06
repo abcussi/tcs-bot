@@ -36,7 +36,7 @@ silver/      extract.py  def extract_main_text(raw: str, content_type: str, url:
              classify.py def classify(text: str, title: str) -> tuple[list[RiskSignal], float]  # signals, risk_score
              entities.py def extract_entities(text: str) -> Entities
              sentiment.py def sentiment(text: str) -> float   # -1..1
-             llm.py      def llm_extract(doc, settings) -> SilverRecord | None (OpenAI path)
+             llm.py      def llm_extract(doc, text, settings, base=None, chain=None) -> SilverRecord | None  # OpenAI path
              store.py    class SilverStore(es=None): ensure_index(); upsert(records) -> int; iter_relevant() -> Iterator[SilverRecord]; get(doc_id)
              pipeline.py def build_silver_record(doc: BronzeDocument) -> SilverRecord ; def run_silver(limit=None) -> dict
 gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts); get_gold_embedder(settings, corpus) -> Embedder-like
