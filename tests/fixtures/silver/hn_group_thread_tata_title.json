@@ -1,0 +1,31 @@
+{
+  "id": 990141,
+  "type": "story",
+  "author": "fictional_hn_user",
+  "title": "Fictional chairman of Tata group retires after long tenure (SYNTHETIC FIXTURE)",
+  "url": "https://news.example.com/fictional-tata-retirement",
+  "text": null,
+  "children": [
+    {
+      "id": 990142,
+      "type": "comment",
+      "author": "fictional_commenter_a",
+      "text": "SYNTHETIC FIXTURE: invented comment. The group built hotels, steel plants and cars over many decades and the chairman was widely admired for philanthropy and long term thinking.",
+      "children": []
+    },
+    {
+      "id": 990143,
+      "type": "comment",
+      "author": "fictional_commenter_b",
+      "text": "Remember that TCS is the group's software arm and a large employer. The code quality from TCS varies by team. Many students hope for a TCS offer after college.",
+      "children": []
+    },
+    {
+      "id": 990144,
+      "type": "comment",
+      "author": "fictional_commenter_c",
+      "text": "The family trusts own most of the holding company and the philanthropic work reaches schools, hospitals and research institutes across the country. The chairman gave many speeches about trust, patience and ethics in business over a very long career at the helm of the group, which grew through steady acquisitions in steel, tea, hospitality, automobiles and power. Admirers point to a culture of modest living and generous giving, and critics ask whether any holding structure can really stay clear of politics and favours, but most agree the succession was handled smoothly and that the next generation inherits a sprawling but well respected conglomerate.",
+      "children": []
+    }
+  ]
+}

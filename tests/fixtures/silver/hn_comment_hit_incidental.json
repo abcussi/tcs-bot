@@ -1,0 +1,12 @@
+{
+  "_tags": ["comment", "author_fictional_hn_user", "story_990101"],
+  "author": "fictional_hn_user",
+  "comment_text": "SYNTHETIC FIXTURE: fictional comment. The streaming studio reversed its restructuring plan after a public outcry, so the planned layoffs of contractors were cancelled. We run a small team and a vendor such as TCS would never have been considered for something this small. Honestly the whole episode says more about management than about outsourcing.",
+  "created_at": "2026-11-01T10:00:00.000Z",
+  "objectID": "990102",
+  "parent_id": 990101,
+  "points": null,
+  "story_id": 990101,
+  "story_title": "Streaming studio reverses restructuring plan (SYNTHETIC FIXTURE)",
+  "story_url": "https://news.example.com/fictional-studio-reversal"
+}

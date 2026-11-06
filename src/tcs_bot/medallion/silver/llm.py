@@ -96,26 +96,38 @@ def merge_llm_output(
     base: SilverRecord, out: LlmSilverOutput, text: str, model: str, threshold: float
 ) -> SilverRecord:
     """Merge an LLM result into the rules-based record."""
-    from tcs_bot.medallion.silver.classify import MAX_EVIDENCE_CHARS, categories_of, score_signals
+    from tcs_bot.medallion.silver.classify import (
+        MAX_EVIDENCE_CHARS,
+        categories_of,
+        combine_points,
+        score_signals,
+    )
     from tcs_bot.medallion.silver.entities import merge_entities
+    from tcs_bot.medallion.silver.pipeline import attribute_risk, is_relevant
 
     seen = {(s.category, s.keyword.lower()) for s in base.risk_signals}
     signals = list(base.risk_signals)
+    added_signals: list[RiskSignal] = []
     for s in out.risk_signals:
         key = (s.category, s.keyword.strip().lower())
         if key in seen or not is_grounded(s.evidence, text):
             continue
         seen.add(key)
         ev = " ".join(s.evidence.split())[:MAX_EVIDENCE_CHARS]
-        signals.append(s.model_copy(update={"keyword": s.keyword.strip(), "evidence": ev}))
+        added = s.model_copy(update={"keyword": s.keyword.strip(), "evidence": ev})
+        signals.append(added)
+        added_signals.append(added)
     relevance = round((base.tcs_relevance + out.tcs_relevance) / 2.0, 4)
+    # keep the rules score (proximity/length-aware) and add only what the LLM contributed
+    llm_extra = attribute_risk(score_signals(added_signals, base.title), relevance, threshold)
+    risk_score = combine_points([base.risk_score, llm_extra]) if added_signals else base.risk_score
     return base.model_copy(
         update={
             "risk_signals": signals,
             "risk_categories": categories_of(signals),
-            "risk_score": max(base.risk_score, score_signals(signals, base.title)),
+            "risk_score": risk_score,
             "tcs_relevance": relevance,
-            "relevant": relevance >= threshold and base.word_count >= 30,
+            "relevant": is_relevant(relevance, base.word_count, base.title, threshold),
             "sentiment": round((base.sentiment + out.sentiment) / 2.0, 4),
             "summary": out.summary.strip() or base.summary,
             "entities": merge_entities(base.entities, out.entities),

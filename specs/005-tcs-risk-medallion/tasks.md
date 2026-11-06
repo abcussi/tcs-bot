@@ -55,11 +55,15 @@
       GDELT artlist item/response; RSS/Atom items; text/markdown passthrough; content-type sniffing;
       never raises. Normalized with `ingestion.normalize.normalize_text`. (AC-005.5)
 - [x] `classify.py` — 65 regex rules over all 10 `RiskCategory` values with severities;
-      sentence-level evidence (<= 300 chars), TCS-sentence weighting (non-TCS x0.7), title boost
-      (x1.5), negation ("denied", "no evidence of", "dismissed the case", "cleared of", ...) lowers
+      sentence-level evidence (<= 300 chars), TCS-proximity weighting (sentence naming TCS x1.0,
+      1/2 sentences away x0.8/x0.6, further x0.25; total far-evidence contribution capped at 18
+      points; long texts damped by `1/(1+0.12*log2(words/300))`), title boost (x1.5), negation ("denied", "no evidence of", "dismissed the case", "cleared of", ...) lowers
       severity one level; dedupe by (category, keyword); risk score `100*(1-prod(1-p/100))`
       (critical 40 / high 25 / medium 12 / low 5 points). `tcs_relevance()` 0..1 with penalties for
-      Tax Collected at Source / LRS / remittance contexts and Tata-group-only stories. (AC-005.5/.6)
+      Tax Collected at Source / LRS / remittance contexts and Tata-group-only stories;
+      "TCS (Tata Consultancy Services)" counts once; when the title does not name TCS the score is
+      x0.6 (recovered as TCS density rises from 1 to 3 mentions/100 words) and x0.6 more for a
+      "Tata ..." headline (passing mentions in threads about something else). (AC-005.5/.6)
 - [x] `entities.py` — regulators gazetteer (canonical names), money (₹/Rs/INR/$/USD/€/£ +
       crore/lakh/million/billion), places gazetteer + aliases, organizations (known list + legal
       suffix pattern), people (known execs + role/honorific patterns); deduped, max 20 each.
@@ -75,7 +79,9 @@
       `ensure_index`, `upsert(records, refresh=False) -> int` (`_id = doc_id`, per-doc failures in
       `last_failed_ids`), `get`, `iter_relevant(min_relevance=None)`, `count`, `stats`, `delete_index`.
 - [x] `pipeline.py` — `build_silver_record(doc, settings=None)` (domain, 2-3 sentence summary,
-      language heuristic, `relevant = relevance >= threshold and word_count >= 30`);
+      language heuristic, `relevant = is_relevant(...)` = relevance >= threshold and (word_count >= 30
+      or the title names TCS); risk of docs below the threshold is scaled by relevance/threshold via
+      `attribute_risk`);
       `run_silver(limit=None, repo=None, store=None)` batches of 50, bad docs skipped, bronze rows
       marked processed only after a successful ES upsert.
 - [x] Synthetic fixtures `tests/fixtures/silver/` (every category, Tax-Collected-at-Source and

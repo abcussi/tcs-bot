@@ -1,0 +1,32 @@
+{
+  "id": 990131,
+  "type": "story",
+  "author": "fictional_hn_user",
+  "title": "Megathread about hiring, visas and layoffs in tech (SYNTHETIC FIXTURE)",
+  "url": "https://news.example.com/fictional-megathread",
+  "text": null,
+  "children": [
+    {
+      "id": 990132,
+      "type": "comment",
+      "author": "fictional_commenter_a",
+      "text": "SYNTHETIC FIXTURE: invented comment. A fictional rival firm was sued in a class action over visa fraud and discrimination against local staff. The fraud allegations led to an investigation by regulators, a hefty fine and a settlement. There were layoffs, a data breach, a ransomware outage and a boycott, and the scandal caused a backlash and criticism. Shares fell, margins declined and auditors resigned amid the controversy.",
+      "children": [
+        {
+          "id": 990133,
+          "type": "comment",
+          "author": "fictional_commenter_b",
+          "text": "Another invented firm faced bribery claims, antitrust scrutiny, tariffs, sanctions and a trade secrets lawsuit. Workers complained about unpaid overtime, toxic culture and forced resignation. Nobody here has seen anything like it.",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 990134,
+      "type": "comment",
+      "author": "fictional_commenter_c",
+      "text": "Somebody mentioned TCS once as one of many outsourcing vendors. It was a throwaway remark about bench staff and nothing else.",
+      "children": []
+    }
+  ]
+}

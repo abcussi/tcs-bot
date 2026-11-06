@@ -1,0 +1,29 @@
+{
+  "_comment": "SYNTHETIC FIXTURE: invented Bing-News-style RSS snippets (title + short description) about a fictional vendor dispute; not real articles.",
+  "cases": [
+    {
+      "id": "contract-ended-after-cyberattack",
+      "title": "Fictional Retailer Ends TCS Contract After Cyberattack; TCS Clarifies Service Role - Example News",
+      "description": "SYNTHETIC FIXTURE: A fictional retailer has ended its contract with TCS after a cyberattack disrupted online orders for weeks. TCS clarified that its service desk role was limited and that no TCS systems were compromised, according to an invented statement.",
+      "category": "data_privacy_cyber"
+    },
+    {
+      "id": "trade-secrets-lawsuit",
+      "title": "Jury Orders TCS To Pay In Invented Trade Secrets Lawsuit - Example News",
+      "description": "SYNTHETIC FIXTURE: A fictional jury found that TCS misappropriated trade secrets of an invented software company, awarding damages in a lawsuit that TCS says it will appeal. The fictional ruling follows years of litigation between the two firms.",
+      "category": "legal_litigation"
+    },
+    {
+      "id": "discrimination-probe",
+      "title": "TCS Faces Probe Over Alleged Discrimination In Invented Layoffs - Example News",
+      "description": "SYNTHETIC FIXTURE: A fictional regulator opened an investigation into whether TCS discriminated against local workers during invented layoffs. TCS said it follows all laws and will cooperate with the fictional agency while the probe continues.",
+      "category": "labor_hr"
+    },
+    {
+      "id": "employee-death-harassment",
+      "title": "TCS Engineer Dies In Fictional Pune Incident; Family Alleges Workplace Harassment - Example News",
+      "description": "SYNTHETIC FIXTURE: Police in a fictional Pune suburb are investigating the death of a TCS engineer after the family alleged workplace harassment by seniors. TCS said it is cooperating with the invented inquiry and extended support to the family.",
+      "category": "labor_hr"
+    }
+  ]
+}

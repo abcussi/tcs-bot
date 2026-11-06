@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -10,9 +11,11 @@ import pytest
 from tcs_bot.medallion.models import BronzeDocument, SilverRecord
 from tcs_bot.medallion.silver import pipeline
 from tcs_bot.medallion.silver.pipeline import (
+    attribute_risk,
     build_silver_record,
     detect_language,
     domain_of,
+    is_relevant,
     run_silver,
     summarize,
 )
@@ -26,6 +29,11 @@ FILES = {
     "hn_thread.json": "application/json",
     "rss_item.xml": "application/rss+xml",
     "gdelt_item.json": "application/json",
+    "hn_comment_hit_incidental.json": "application/json",
+    "hn_story_hit_tcs_title.json": "application/json",
+    "hn_story_hit_tcs_title_neutral.json": "application/json",
+    "hn_long_generic_thread.json": "application/json",
+    "hn_group_thread_tata_title.json": "application/json",
 }
 
 
@@ -114,12 +122,115 @@ def test_false_positives_marked_irrelevant():
         assert rec.clean_text  # kept for audit
 
 
-def test_relevance_requires_minimum_words():
-    """AC-005.6: a TCS headline alone (GDELT title, < 30 words) is not 'relevant'."""
+def test_title_naming_tcs_is_relevant_without_minimum_words():
+    """AC-005.6: a headline-only TCS item (< 30 words) counts when the TITLE names TCS."""
     rec = build_silver_record(_doc(4, "gdelt_item.json"))
     assert rec.tcs_relevance >= 0.35
-    assert rec.word_count < 30 and rec.relevant is False
+    assert rec.word_count < 30 and rec.relevant is True
     assert "geopolitical_immigration" in rec.risk_categories
+
+
+@pytest.mark.parametrize(
+    "name, category",
+    [
+        ("hn_story_hit_tcs_title.json", "labor_hr"),  # "TCS announces ... layoffs ..."
+        ("hn_story_hit_tcs_title_neutral.json", None),  # "TCS tops ... estimates ..."
+    ],
+)
+def test_title_only_hn_story_hits_are_relevant(name, category):
+    """AC-005.6: Algolia story hits are title-only (< 30 words) yet strongly about TCS."""
+    rec = build_silver_record(_doc(8, name, source="hackernews", depth=0))
+    assert rec.word_count < 30
+    assert rec.tcs_relevance >= 0.35
+    assert rec.relevant is True
+    if category:
+        assert category in rec.risk_categories
+
+
+def test_is_relevant_title_rule():
+    """AC-005.6: short docs need TCS in the title; long docs and low relevance unchanged."""
+    assert is_relevant(0.8, 11, "TCS layoffs herald AI shakeup", 0.35) is True
+    assert is_relevant(0.8, 11, "Outsourcing layoffs herald AI shakeup", 0.35) is False
+    assert is_relevant(0.2, 11, "TCS layoffs", 0.35) is False  # below threshold
+    assert is_relevant(0.5, 400, "A thread about jobs", 0.35) is True
+    assert is_relevant(0.3, 400, "TCS layoffs", 0.35) is False
+
+
+def test_short_body_only_tcs_mention_is_not_relevant():
+    """AC-005.6: < 30 words and TCS only in the body (title silent) stays irrelevant."""
+    raw = json.dumps({"title": "Weekend plans", "text": "SYNTHETIC FIXTURE: TCS TCS TCS TCS TCS."})
+    rec = build_silver_record(_doc(9, "hn_thread.json", title="Weekend plans", raw_content=raw))
+    assert rec.word_count < 30 and rec.tcs_relevance >= 0.35
+    assert rec.relevant is False
+
+
+def test_incidental_hn_comment_hit_is_irrelevant_and_demoted():
+    """AC-005.6: HN comment hit that names TCS once in passing is not a TCS risk document."""
+    rec = build_silver_record(_doc(11, "hn_comment_hit_incidental.json", source="hackernews"))
+    assert rec.word_count >= 30
+    assert rec.tcs_relevance < 0.35 and rec.relevant is False
+    assert rec.risk_score < 25  # layoff words in the story are not TCS risk
+
+
+def test_tata_group_headline_with_tcs_in_body_is_irrelevant():
+    """AC-005.6: 'chairman of Tata group retires' thread with a few TCS asides is a group story."""
+    rec = build_silver_record(_doc(12, "hn_group_thread_tata_title.json", source="hackernews"))
+    assert rec.tcs_relevance < 0.35 and rec.relevant is False
+
+
+def _inflated_thread(extra_comments: int) -> str:
+    thread = json.loads((FIXTURES / "hn_long_generic_thread.json").read_text(encoding="utf-8"))
+    filler = "Invented filler remark about commuting, coffee, keyboards and weekend plans. " * 4
+    thread["children"] += [
+        {"id": 2000 + i, "type": "comment", "author": "f", "text": f"{filler}{i}.", "children": []}
+        for i in range(extra_comments)
+    ]
+    return json.dumps(thread)
+
+
+def test_long_generic_thread_does_not_inflate_risk_with_length():
+    """AC-005.5/.6: many generic risk words far from the only TCS aside are not a TCS risk."""
+    scores = []
+    for extra in (0, 15, 35):
+        rec = build_silver_record(
+            _doc(13, "hn_long_generic_thread.json", raw_content=_inflated_thread(extra))
+        )
+        assert rec.relevant is False
+        assert len(rec.risk_categories) >= 6  # the generic words are still detected
+        scores.append(rec.risk_score)
+    assert scores[0] < 40 and scores == sorted(scores, reverse=True)  # saturates, never grows
+    focused = build_silver_record(
+        _bing_doc(json.loads((FIXTURES / "bing_news_snippets.json").read_text("utf-8"))["cases"][1])
+    )
+    assert focused.relevant and focused.risk_score > scores[0] + 20
+
+
+def _bing_doc(case: dict) -> BronzeDocument:
+    raw = (
+        f"<rss><channel><item><title>{case['title']}</title>"
+        f"<description>{case['description']}</description></item></channel></rss>"
+    )
+    return _doc(20, "rss_item.xml", source="bing_news", depth=0, raw_content=raw)
+
+
+BING_CASES = json.loads((FIXTURES / "bing_news_snippets.json").read_text("utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", BING_CASES, ids=[c["id"] for c in BING_CASES])
+def test_bing_style_tcs_snippets_stay_relevant_with_sensible_category(case):
+    """AC-005.6: focused Bing-News snippets about TCS remain relevant, score and categorised."""
+    rec = build_silver_record(_bing_doc(case))
+    assert rec.relevant is True and rec.tcs_relevance >= 0.8
+    assert case["category"] in rec.risk_categories
+    assert rec.risk_score >= 40
+
+
+def test_attribute_risk_scales_only_below_threshold():
+    """AC-005.5: off-topic docs (relevance < threshold) get a proportionally lower risk score."""
+    assert attribute_risk(80.0, 0.5, 0.35) == 80.0
+    assert attribute_risk(80.0, 0.35, 0.35) == 80.0
+    assert attribute_risk(80.0, 0.175, 0.35) == 40.0
+    assert attribute_risk(80.0, 0.0, 0.35) == 0.0
 
 
 def test_threshold_from_settings(monkeypatch):

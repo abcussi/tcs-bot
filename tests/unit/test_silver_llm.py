@@ -110,3 +110,22 @@ def test_is_grounded():
     assert is_grounded("The client cited delivery delays", TEXT)
     assert not is_grounded("Completely unrelated invented quote about rockets", TEXT)
     assert not is_grounded("", TEXT)
+
+
+def test_merge_applies_title_rule_and_keeps_rules_risk_score():
+    """AC-005.6: a short TCS-titled item stays relevant after merge; LLM adds no inflation."""
+    s = _openai_settings()
+    doc = _doc().model_copy(
+        update={
+            "title": "TCS announces fictional layoffs",
+            "raw_content": "SYNTHETIC FIXTURE: note.",
+        }
+    )
+    base = build_rules_record(doc, s)
+    assert base.word_count < 30 and base.relevant
+    out = LlmSilverOutput(
+        tcs_relevance=0.9, risk_signals=[], entities=Entities(), summary="s", sentiment=0.0
+    )
+    rec = llm_extract(doc, base.clean_text, s, base=base, chain=RunnableLambda(lambda _: out))
+    assert rec is not None and rec.relevant is True
+    assert rec.risk_score == base.risk_score

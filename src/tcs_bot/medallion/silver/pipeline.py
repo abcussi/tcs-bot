@@ -20,6 +20,7 @@ from tcs_bot.medallion.silver.classify import (
     classify,
     split_sentences,
     tcs_relevance,
+    title_names_tcs,
 )
 from tcs_bot.medallion.silver.entities import extract_entities
 from tcs_bot.medallion.silver.extract import extract_main_text
@@ -48,6 +49,25 @@ _EN_STOP = frozenset(
     )
 )
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
+
+
+def is_relevant(relevance: float, word_count: int, title: str, threshold: float) -> bool:
+    """AC-005.6: ``relevance >= threshold`` and enough text, unless the title names TCS.
+
+    Short items (headline-only Hacker News hits, RSS stubs) fall below
+    :data:`MIN_WORDS_RELEVANT` words; they still count when the *title* itself names TCS because
+    the headline then is the story. A body-only mention in a short item does not.
+    """
+    if relevance < threshold:
+        return False
+    return word_count >= MIN_WORDS_RELEVANT or title_names_tcs(title)
+
+
+def attribute_risk(risk_score: float, relevance: float, threshold: float) -> float:
+    """Scale the risk of an off-topic document (relevance below threshold) by how on-topic it is."""
+    if threshold <= 0 or relevance >= threshold:
+        return risk_score
+    return round(risk_score * max(relevance, 0.0) / threshold, 1)
 
 
 def domain_of(url: str) -> str:
@@ -92,6 +112,7 @@ def build_rules_record(doc: BronzeDocument, settings: Settings | None = None) ->
     word_count = len(_WORD.findall(text))
     signals, risk_score = classify(text, title)
     relevance = tcs_relevance(text, title)
+    risk_score = attribute_risk(risk_score, relevance, s.medallion_relevance_threshold)
     return SilverRecord(
         doc_id=doc.id if doc.id is not None else 0,
         url=doc.url,
@@ -109,7 +130,7 @@ def build_rules_record(doc: BronzeDocument, settings: Settings | None = None) ->
         published_at=doc.published_at,
         entities=extract_entities(f"{title}\n{text}"),
         tcs_relevance=relevance,
-        relevant=relevance >= s.medallion_relevance_threshold and word_count >= MIN_WORDS_RELEVANT,
+        relevant=is_relevant(relevance, word_count, title, s.medallion_relevance_threshold),
         risk_signals=signals,
         risk_categories=categories_of(signals),  # type: ignore[arg-type]
         sentiment=sentiment(f"{title}. {text}"),

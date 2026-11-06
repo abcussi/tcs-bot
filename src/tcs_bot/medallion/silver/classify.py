@@ -19,7 +19,14 @@ SEVERITIES: tuple[str, ...] = ("low", "medium", "high", "critical")
 SEVERITY_POINTS: dict[str, float] = {"low": 5.0, "medium": 12.0, "high": 25.0, "critical": 40.0}
 MAX_EVIDENCE_CHARS = 300
 TITLE_BOOST = 1.5
-NON_TCS_SENTENCE_WEIGHT = 0.7
+NON_TCS_SENTENCE_WEIGHT = 0.7  # evidence without document context (LLM-merged signals)
+# Evidence weight by sentence distance to the nearest sentence that names TCS (the title counts
+# as the sentence before the body). Far evidence is generic discussion, not a TCS risk.
+PROXIMITY_WEIGHTS: tuple[float, ...] = (1.0, 0.8, 0.6)
+FAR_WEIGHT = 0.25
+FAR_CAP = 18.0  # far evidence can never contribute more than this many points in total
+LENGTH_REF_WORDS = 300
+LENGTH_DAMPING = 0.12  # score /= 1 + 0.12 * log2(words / 300) for long texts
 
 
 @dataclass(frozen=True)
@@ -346,10 +353,20 @@ _NEGATION = re.compile(
 )
 
 # --------------------------------------------------------------------------- relevance
+BODY_ONLY_FACTOR = 0.6  # relevance multiplier when the title does not name TCS
+BODY_FOCUS_FLOOR_PCT = 1.0  # TCS mentions per 100 words below which a body-only hit is incidental
+BODY_FOCUS_SPAN_PCT = 2.0  # ... and above floor+span the body-only penalty is gone
+TATA_TITLE_FACTOR = 0.6  # headline about Tata (Sons/group/chairman) with TCS only in the body
 _TCS_STRONG = re.compile(
     r"(?-i:\bTCS\b)|\bTata Consultancy\b|\btcs\.com\b|\bKrithivasan\b", re.IGNORECASE
 )
 _TCS_WEAK = re.compile(r"\bChandrasekaran\b", re.IGNORECASE)
+# "TCS (Tata Consultancy Services)" / "Tata Consultancy Services (TCS)" name the company once.
+_TCS_DOUBLE = re.compile(
+    r"\bTata Consultancy(?: Services)?(?:\s*\(\s*(?-i:TCS)\s*\)|,?\s+(?-i:TCS)\b)"
+    r"|(?-i:\bTCS\b)\s*\(\s*Tata Consultancy(?: Services)?\s*\)",
+    re.IGNORECASE,
+)
 _TCS_ANY = re.compile(_TCS_STRONG.pattern + r"|\bChandrasekaran\b", re.IGNORECASE)
 _TCS_EXPLICIT = re.compile(r"\bTata Consultancy\b|\btcs\.com\b|\bKrithivasan\b", re.IGNORECASE)
 _TAX_STRONG = re.compile(
@@ -374,6 +391,7 @@ _TATA_OTHER = re.compile(
     r"|\bTanishq\b|\bTaj Hotels\b|(?-i:\bIHCL\b)|\bVoltas\b|\bTrent\b|\bBigBasket\b|\bVistara\b",
     re.IGNORECASE,
 )
+_TATA_TITLE = re.compile(r"\bTata\b", re.IGNORECASE)  # group/chairman headline without TCS
 _WORD = re.compile(r"\w+")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])[\"')\]]*\s+(?=[\"'(\[]?[A-Z0-9₹$£€])|\n+")
 
@@ -387,6 +405,11 @@ def mentions_tcs(text: str) -> bool:
     return bool(_TCS_ANY.search(text or ""))
 
 
+def title_names_tcs(title: str) -> bool:
+    """True if the headline itself names TCS (company name, ``TCS``, CEO...)."""
+    return bool(_TCS_ANY.search(title or ""))
+
+
 def _clip(sentence: str) -> str:
     s = " ".join(sentence.split())
     return s if len(s) <= MAX_EVIDENCE_CHARS else s[: MAX_EVIDENCE_CHARS - 1].rstrip() + "…"
@@ -396,9 +419,41 @@ def _lower(severity: str) -> str:
     return SEVERITIES[max(0, SEVERITIES.index(severity) - 1)]
 
 
-def _signal_points(severity: str, tcs: bool, title_hit: bool) -> float:
-    pts = SEVERITY_POINTS[severity] * (1.0 if tcs else NON_TCS_SENTENCE_WEIGHT)
-    return pts * (TITLE_BOOST if title_hit else 1.0)
+def _signal_points(severity: str, weight: float, title_hit: bool) -> float:
+    return SEVERITY_POINTS[severity] * weight * (TITLE_BOOST if title_hit else 1.0)
+
+
+def _tcs_distances(flags: list[bool]) -> list[int | None]:
+    """Distance (in units) from every unit to the nearest TCS-naming unit; ``None`` if none."""
+    n = len(flags)
+    dist: list[int | None] = [None] * n
+    last: int | None = None
+    for i in range(n):
+        if flags[i]:
+            last = i
+        if last is not None:
+            dist[i] = i - last
+    last = None
+    for i in range(n - 1, -1, -1):
+        if flags[i]:
+            last = i
+        if last is not None:
+            d = last - i
+            dist[i] = d if dist[i] is None else min(dist[i], d)  # type: ignore[type-var]
+    return dist
+
+
+def _proximity_weight(distance: int | None) -> float:
+    if distance is None or distance >= len(PROXIMITY_WEIGHTS):
+        return FAR_WEIGHT
+    return PROXIMITY_WEIGHTS[distance]
+
+
+def length_damping(words: int) -> float:
+    """1.0 up to :data:`LENGTH_REF_WORDS`, then ``1 / (1 + 0.12 * log2(words / ref))``."""
+    if words <= LENGTH_REF_WORDS:
+        return 1.0
+    return 1.0 / (1.0 + LENGTH_DAMPING * math.log2(words / LENGTH_REF_WORDS))
 
 
 def combine_points(points: list[float]) -> float:
@@ -415,7 +470,8 @@ def score_signals(signals: list[RiskSignal], title: str = "") -> float:
     points = []
     for s in signals:
         title_hit = bool(title_l) and s.evidence.lower().strip(" …") in title_l
-        points.append(_signal_points(s.severity, mentions_tcs(s.evidence), title_hit))
+        weight = 1.0 if mentions_tcs(s.evidence) else NON_TCS_SENTENCE_WEIGHT
+        points.append(_signal_points(s.severity, weight, title_hit))
     return combine_points(points)
 
 
@@ -424,22 +480,31 @@ def classify(text: str, title: str = "") -> tuple[list[RiskSignal], float]:
 
     Every sentence (the title counts as one) is matched against :data:`TAXONOMY`. For each
     ``(category, keyword)`` the strongest occurrence is kept: highest (negation-adjusted) severity,
-    preferring sentences that mention TCS and title hits. Evidence is the sentence (<= 300 chars).
+    preferring sentences at/near a TCS mention and title hits. Evidence is the sentence (<= 300
+    chars).
+
+    The score is TCS-focused: a signal is weighted by its sentence distance to the nearest sentence
+    naming TCS (:data:`PROXIMITY_WEIGHTS`, :data:`FAR_WEIGHT`), the contribution of distant
+    evidence is capped at :data:`FAR_CAP` points, and long texts are damped (:func:`length_damping`)
+    so a long thread full of generic words is not rated above a focused TCS article.
     """
     units: list[tuple[str, bool]] = []
     if title and title.strip():
         units.append((title.strip(), True))
     units.extend((s, False) for s in split_sentences(text))
+    tcs_flags = [mentions_tcs(sentence) for sentence, _ in units]
+    distances = _tcs_distances(tcs_flags)
 
-    best: dict[tuple[str, str], tuple[float, RiskSignal, bool, bool]] = {}
-    for sentence, is_title in units:
-        tcs = mentions_tcs(sentence)
+    # (points, signal, weight, title_hit)
+    best: dict[tuple[str, str], tuple[float, RiskSignal, float, bool]] = {}
+    for (sentence, is_title), distance in zip(units, distances, strict=True):
+        weight = _proximity_weight(distance)
         negated = bool(_NEGATION.search(sentence))
         for rule in TAXONOMY:
             if not rule.pattern.search(sentence):
                 continue
             severity = _lower(rule.severity) if negated else rule.severity
-            pts = _signal_points(severity, tcs, is_title)
+            pts = _signal_points(severity, weight, is_title)
             key = (rule.category, rule.keyword)
             prev = best.get(key)
             if prev is None or pts > prev[0]:
@@ -450,17 +515,22 @@ def classify(text: str, title: str = "") -> tuple[list[RiskSignal], float]:
                     evidence=_clip(sentence),
                 )
                 title_hit = is_title or (prev[3] if prev else False)
-                best[key] = (pts, sig, tcs, title_hit)
+                best[key] = (pts, sig, weight, title_hit)
             elif is_title:
                 best[key] = (prev[0], prev[1], prev[2], True)
 
-    points: list[float] = []
+    near: list[float] = []
+    far: list[float] = []
     signals: list[RiskSignal] = []
-    for _pts, sig, tcs, title_hit in sorted(best.values(), key=lambda v: -v[0]):
+    for _pts, sig, weight, title_hit in sorted(best.values(), key=lambda v: -v[0]):
         signals.append(sig)
         # the title boost applies even when the evidence kept is a body sentence
-        points.append(_signal_points(sig.severity, tcs, title_hit))
-    return signals, combine_points(points)
+        pts = _signal_points(sig.severity, weight, title_hit)
+        (near if weight > FAR_WEIGHT else far).append(pts)
+    if far:
+        near.append(min(combine_points(far), FAR_CAP))
+    words = len(_WORD.findall(f"{title} {text}"))
+    return signals, round(combine_points(near) * length_damping(words), 1)
 
 
 def categories_of(signals: list[RiskSignal]) -> list[str]:
@@ -483,16 +553,25 @@ def tcs_relevance(text: str, title: str = "") -> float:
     tax_strong = len(_TAX_STRONG.findall(full))
     tax_weak = len(_TAX_WEAK.findall(full))
     # "TCS" acronyms inside tax phrases are not company mentions.
-    strong = max(len(_TCS_STRONG.findall(full)) - len(_TCS_TAX.findall(full)), 0)
+    strong = len(_TCS_STRONG.findall(full)) - len(_TCS_TAX.findall(full))
+    strong = max(strong - len(_TCS_DOUBLE.findall(full)), 0)
     weak = len(_TCS_WEAK.findall(full))
     mentions = strong + 0.5 * weak
     if mentions <= 0:
         return 0.0
 
     mention_score = 1.0 - math.exp(-mentions / 3.0)
-    density_score = min(1.0, (mentions / words) * 100.0)
+    density_pct = (mentions / words) * 100.0
+    density_score = min(1.0, density_pct)
     title_hit = 1.0 if _TCS_ANY.search(title) else 0.0
     score = 0.45 * mention_score + 0.25 * density_score + 0.30 * title_hit
+    if not title_hit:
+        # TCS is only named in the body: a passing mention in a thread about something else
+        # unless TCS is a large share of the text. Group headlines (Tata & Sons...) count less.
+        focus = min(max((density_pct - BODY_FOCUS_FLOOR_PCT) / BODY_FOCUS_SPAN_PCT, 0.0), 1.0)
+        score *= BODY_ONLY_FACTOR + (1.0 - BODY_ONLY_FACTOR) * focus
+        if _TATA_TITLE.search(title):
+            score *= TATA_TITLE_FACTOR
 
     explicit = bool(_TCS_EXPLICIT.search(full))
     if tax_strong or tax_weak >= 2:

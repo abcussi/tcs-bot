@@ -39,6 +39,9 @@ silver/      extract.py  def extract_main_text(raw: str, content_type: str, url:
              llm.py      def llm_extract(doc, text, settings, base=None, chain=None) -> SilverRecord | None  # OpenAI path
              store.py    class SilverStore(es=None): ensure_index(); upsert(records) -> int; iter_relevant() -> Iterator[SilverRecord]; get(doc_id)
              pipeline.py def build_silver_record(doc: BronzeDocument) -> SilverRecord ; def run_silver(limit=None) -> dict
+                         # helpers: is_relevant(relevance, word_count, title, threshold) -> bool;
+                         #          attribute_risk(risk_score, relevance, threshold) -> float
+             classify.py also: title_names_tcs(title) -> bool; length_damping(words) -> float
 gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts); get_gold_embedder(settings, corpus) -> Embedder-like
              vector_store.py class GoldVectorStore(url, model): ensure(dim); upsert_docs/upsert_chunks; search(vector, k, filters) -> list[GoldHit]
              analytics.py cosine_matrix(X); knn_graph(X, ids, k, threshold) -> nx.Graph; clusters(...); project_2d(X)
