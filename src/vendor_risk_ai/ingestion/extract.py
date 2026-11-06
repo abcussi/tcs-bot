@@ -12,7 +12,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import PurePath
 
-from vendor_risk_ai.api.errors import ValidationAppError
+from vendor_risk_ai.errors import ValidationAppError
 from vendor_risk_ai.logging_setup import get_logger
 
 log = get_logger(__name__)

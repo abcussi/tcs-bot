@@ -1,4 +1,7 @@
-"""Domain errors + FastAPI handlers (AC-003.1, constitution §8).
+"""FastAPI error handlers (AC-003.1, constitution §8).
+
+The ``AppError`` hierarchy lives in the framework-neutral :mod:`vendor_risk_ai.errors` and is
+re-exported here for backwards compatibility.
 
 Every error leaves the API as ``{"error": {"code", "message", "details"}}``.
 """
@@ -12,49 +15,25 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from vendor_risk_ai.errors import (
+    AppError,
+    DependencyUnavailable,
+    NotFoundError,
+    UpstreamError,
+    ValidationAppError,
+)
 from vendor_risk_ai.logging_setup import get_logger
 
 log = get_logger(__name__)
 
-
-class AppError(Exception):
-    """Base for every domain error surfaced to API / MCP clients."""
-
-    def __init__(
-        self, code: str, message: str, status_code: int = 400, details: Any = None
-    ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
-        self.details = details
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"error": {"code": self.code, "message": self.message, "details": self.details}}
-
-
-class NotFoundError(AppError):
-    def __init__(self, message: str, details: Any = None, *, code: str = "not_found") -> None:
-        super().__init__(code, message, 404, details)
-
-
-class ValidationAppError(AppError):
-    def __init__(
-        self, message: str, details: Any = None, *, code: str = "validation_error"
-    ) -> None:
-        super().__init__(code, message, 422, details)
-
-
-class UpstreamError(AppError):
-    def __init__(self, message: str, details: Any = None, *, code: str = "upstream_error") -> None:
-        super().__init__(code, message, 502, details)
-
-
-class DependencyUnavailable(AppError):
-    def __init__(
-        self, message: str, details: Any = None, *, code: str = "dependency_unavailable"
-    ) -> None:
-        super().__init__(code, message, 503, details)
+__all__ = [
+    "AppError",
+    "DependencyUnavailable",
+    "NotFoundError",
+    "UpstreamError",
+    "ValidationAppError",
+    "register_error_handlers",
+]
 
 
 def _envelope(code: str, message: str, details: Any = None) -> dict[str, Any]:
