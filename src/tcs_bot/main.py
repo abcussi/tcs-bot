@@ -19,7 +19,7 @@ from tcs_bot.logging_setup import configure_logging, get_logger
 
 log = get_logger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
-INFRA_SERVICES = ["mysql", "redis", "elasticsearch"]
+INFRA_SERVICES = ["mysql", "redis", "elasticsearch", "qdrant"]
 
 
 # ---------------------------------------------------------------- infra
