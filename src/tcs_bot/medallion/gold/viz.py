@@ -383,6 +383,7 @@ function buildPalettes() {
     palettes[mode] = { groups: gs, map: map };
   });
 }
+buildPalettes();
 function colorOf(n, mode) { return palettes[mode || state.colorBy].map.get(keyOf(n, mode || state.colorBy)) || tokens.other; }
 function inGroup(n) {
   if (state.group === null) return true;
@@ -884,7 +885,7 @@ var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') :
 if (mq && mq.addEventListener) mq.addEventListener('change', function () { readTokens(); buildPalettes(); renderLegend(); renderSide(); draw(); });
 
 // ------------------------------------------------------------------ boot
-buildPalettes(); renderLegend(); rebuildLinks();
+renderLegend(); rebuildLinks();
 $('min-cos-v').textContent = fmt(state.minCos); updateHistThr(); renderSide();
 if (!nodes.length) stage.appendChild(el('div', { cls: 'empty', text: 'No relevant silver documents yet — run `tcs-bot medallion run`.' }));
 window.addEventListener('resize', resize);

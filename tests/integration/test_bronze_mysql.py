@@ -139,7 +139,8 @@ def test_migration_002_tables_and_idempotent(test_db):
     with transaction() as cur:
         cur.execute(
             "SELECT TABLE_NAME AS t, ENGINE AS e, TABLE_COLLATION AS c "
-            "FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('crawl_runs','bronze_documents')"
+            "FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
+            "AND TABLE_NAME IN ('crawl_runs','bronze_documents')"
         )
         tables = {r["t"]: r for r in cur.fetchall()}
         cur.execute(

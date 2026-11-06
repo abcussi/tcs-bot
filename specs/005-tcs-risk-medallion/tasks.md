@@ -1,5 +1,45 @@
 # 005 — Tasks
 
+## BRONZE (`crawler/src/gfinance_crawler/news/`, `src/tcs_bot/medallion/bronze.py`, migration 002; owner: agent BRONZE)
+- [x] `news/models.py` — `RawDocument` (BronzeDocument fields minus `id`/`run_id`, plus
+      crawler-internal `follow_url`, excluded from `model_dump()`), `FetchResult(url, final_url,
+      status, content_type, text, error, blocked)` + `.ok`. (AC-005.1)
+- [x] `news/queries.py` — 22 `TCS_RISK_QUERIES` (ethics, compliance, lawsuit, fine, layoffs, data
+      breach, cyber attack, H-1B visa fraud, discrimination, investigation, SEBI, controversy, outage,
+      client loss, whistleblower, bribery, tax dispute, ESG, union, trade secrets Epic/DXC/CSC),
+      `COMMUNITY_SUBREDDITS`, `DEFAULT_ALLOWED_DOMAINS` (suffix-matched) + `domain_allowed()`. (AC-005.1/.3)
+- [x] `news/sources.py` — `Source` protocol; `GoogleNewsRSS`, `BingNewsRSS` (apiclick unwrapped),
+      `GdeltDoc`, `HackerNews` (Algolia; depth 1 = items/{story_id}), `RedditSearch` (site-wide +
+      per-subreddit; depth 1 = permalink.json), `LocalInbox(path)` (html/htm/txt/md/json/pdf via
+      pypdf; query-independent, not relevance-filtered). Blocked/failing endpoints raise
+      `SearchError(blocked=...)`. (AC-005.1)
+- [x] `news/fetch.py` — `PoliteFetcher`: robots.txt per origin through the same client (failure =>
+      allow), per-domain delay, tenacity retries on transport/5xx/429 (not on proxy CONNECT
+      refusals), 401/403/451/robots/proxy => `blocked`, PDFs -> text, binary refused, never raises. (AC-005.2)
+- [x] `news/links.py` — `canonical_url`, `extract_links`, `extract_links_json`, `is_tcs_relevant`
+      (rejects Tax-Collected-at-Source / LRS contexts). (AC-005.2/.3)
+- [x] `news/bfs.py` — `RiskCrawler` breadth-first, hard caps depth 2 / 500 docs, canonical-URL
+      dedupe of fetches and stored docs, relevance at every depth, depth-2 links only when
+      anchor/URL is TCS-relevant and domain allow-listed, blocked source disabled without stopping
+      others, `stats` (CrawlStats keys + `links_skipped`, `errors`). (AC-005.2/.3)
+- [x] `db/schema_002_medallion.sql` (`crawl_runs`, `bronze_documents`; unique `url_sha256`,
+      indexes on silver watermark, run_id, source; FK run_id ON DELETE SET NULL) and versioned
+      `db/migrate.py` (`MIGRATIONS`, `statements_for`, `all_statements`, `LATEST_VERSION`;
+      per-version compensating rollback; idempotent). (AC-005.4)
+- [x] `medallion/bronze.py` — `BronzeRepository` (start_run/finish_run/get_run, save_batch ->
+      new-row count, keyset-paginated `iter_unprocessed`, `mark_processed`, `count`), `to_bronze`,
+      `default_sources`, `run_bronze` (batches of 25, run recorded even on failure). (AC-005.4)
+- [x] `data/bronze/inbox/` (.gitkeep + README) for offline ingestion.
+- [x] Tests: `crawler/tests/test_news_{links,fetch,sources,bfs}.py` + synthetic fixtures in
+      `crawler/tests/fixtures/news/`; `tests/unit/test_bronze_layer.py`; migration tests updated
+      for 001+002; `tests/integration/test_bronze_mysql.py` (throwaway `vendor_risk_bronzetest` DB).
+- Notes / deviations: `run_bronze` adds keyword-only `repo`, `allowed_domains`,
+  `per_query_limit`, `inbox_dir` and defaults caps to settings (None). `CrawlStats.stored` = NEW
+  bronze rows; rows already in bronze count as `duplicates`. Depth-0 items are also
+  relevance-filtered (except LocalInbox). GDELT depth-0 url is `...doc/doc?format=json&mode=artlist&item=<article url>`
+  (GDELT has no item permalink). reddit.com robots.txt disallows crawlers, so in production
+  RedditSearch is normally reported as blocked.
+
 ## SILVER (`src/tcs_bot/medallion/silver/`, owner: agent SILVER)
 - [x] `extract.py` — `extract_main_text(raw, content_type, url) -> (text, title|None)`: HTML via
       trafilatura (favor_recall, no comments) + bs4 fallback (script/style/nav/footer/header/aside
