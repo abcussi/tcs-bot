@@ -107,6 +107,22 @@
       tests moved to the fake; `tests/integration/test_gold_vector_es.py` (throwaway
       `gold-test-<uuid>` indices, deleted after).
 
+## READ layer (`src/tcs_bot/medallion/read/`, API + MCP read surface; AC-005.12)
+- [x] `read/models.py` (filters, page, list/detail/similar/aggregation/cluster models), `queries.py`
+      (ES DSL builders + aggregation parsing + error mapping), `gold_graph.py` (graph.json cache by
+      mtime, node / merged-duplicate lookup), `bronze_reader.py` (MySQL lineage, body only on
+      `include_raw`), `data.py` (`TcsData`, `get_tcs_data` / `set_tcs_data`).
+- [x] `GET /tcs/risks/documents`, `/documents/{doc_id}`, `/documents/{doc_id}/similar`,
+      `/categories`, `/overview`, `/clusters`, `/clusters/{cluster_id}` with typed responses.
+- [x] MCP tools `list_tcs_risks`, `get_tcs_risk_document`, `similar_tcs_risks`, `tcs_risk_clusters`.
+- [x] Tests: `tests/unit/test_read_layer.py` (+ doubles `fake_silver_es.py`, `FakeES.get`; SYNTHETIC
+      FIXTURE data), live read-only `tests/integration/test_read_layer_live.py`.
+- Notes: the read layer never writes. Silver has no cluster / community fields, so those filters
+  resolve member ids from `graph.json` (gold nodes only; documents folded away by dedupe are not
+  members). A deduped document's `/similar` uses the kept document's vector (`resolved_doc_id`).
+  `by_severity` counts risk SIGNALS, not documents. `n_signals` on cluster members counts the at
+  most 6 signals gold keeps.
+
 ## Verification log
 - SILVER verified by lead (lint clean; 68 unit + 2 integration tests pass against live ES).
   Not yet run against real bronze rows: `bronze_documents` needs migration 002 applied.

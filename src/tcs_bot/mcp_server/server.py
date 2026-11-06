@@ -21,6 +21,7 @@ except ImportError:  # mcp >= 2 renamed FastMCP -> MCPServer (same decorator API
 
 from tcs_bot.errors import AppError
 from tcs_bot.medallion.models import GoldHit
+from tcs_bot.medallion.read import DocumentDetail, DocumentPage, SimilarDocuments
 from tcs_bot.schemas.api import ReportRequest, VendorOut
 from tcs_bot.schemas.report import RiskReport
 
@@ -33,7 +34,8 @@ mcp = FastMCP(
         "Generate structured third-party (vendor) risk reports for capital-markets firms. "
         "Call list_vendors to find a vendor, then generate_vendor_risk_report. "
         "For TCS (Tata Consultancy Services) risk intelligence from news and communities use "
-        "search_tcs_risks and tcs_risk_summary."
+        "search_tcs_risks and tcs_risk_summary; browse them with list_tcs_risks, "
+        "get_tcs_risk_document, similar_tcs_risks and tcs_risk_clusters."
     ),
 )
 
@@ -123,6 +125,116 @@ def tcs_risk_summary() -> dict[str, Any]:
 
     try:
         return load_summary()
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+_SORTS = ("risk_score", "published_at", "tcs_relevance")
+
+
+def _read_input[M](model: type[M], **fields: Any) -> M:
+    """Build a read-layer input model; invalid values become a ``validation_error`` ToolError."""
+    try:
+        return model(**fields)
+    except ValidationError as exc:
+        err = exc.errors(include_context=False, include_url=False, include_input=False)[0]
+        where = ".".join(str(p) for p in err["loc"])
+        raise ToolError(f"validation_error: {where}: {err['msg']}") from exc
+
+
+@mcp.tool()
+def list_tcs_risks(
+    category: str | None = None,
+    min_severity: str | None = None,
+    min_risk_score: float | None = None,
+    source: str | None = None,
+    source_type: str | None = None,
+    query: str | None = None,
+    published_from: str | None = None,
+    published_to: str | None = None,
+    cluster: int | None = None,
+    community: int | None = None,
+    sort: str = "risk_score",
+    order: str = "desc",
+    limit: int = 10,
+    offset: int = 0,
+    include_irrelevant: bool = False,
+) -> DocumentPage:
+    """List TCS risk documents (silver layer) with filters, sorting and pagination.
+
+    Filters (all optional, ANDed): ``category`` (ethics, compliance_regulatory, legal_litigation,
+    data_privacy_cyber, labor_hr, financial, operational_delivery, reputational, esg,
+    geopolitical_immigration), ``min_severity`` (low|medium|high|critical),
+    ``min_risk_score`` (0-100), ``source`` (e.g. bing_news, hackernews), ``source_type``
+    (news|community|corporate|other), ``query`` (free text on title/text), ``published_from`` /
+    ``published_to`` (ISO dates), ``cluster`` / ``community`` (gold ids). ``sort`` is
+    risk_score|published_at|tcs_relevance, ``order`` asc|desc, ``limit`` 1-100. Returns the page
+    ``total`` and one summary row per document (use get_tcs_risk_document for the details)."""
+    from tcs_bot.medallion.read import DocumentFilters, Page, get_tcs_data
+
+    if sort not in _SORTS:
+        raise ToolError(f"validation_error: sort must be one of {', '.join(_SORTS)}")
+    filters = _read_input(
+        DocumentFilters,
+        category=[category] if category else [],
+        min_severity=min_severity,
+        min_risk_score=min_risk_score,
+        source=[source] if source else [],
+        source_type=[source_type] if source_type else [],
+        relevant=None if include_irrelevant else True,
+        published_from=published_from,
+        published_to=published_to,
+        cluster=cluster,
+        community=community,
+        q=query,
+    )
+    page = _read_input(Page, limit=limit, offset=offset, sort=sort, order=order)
+    try:
+        return get_tcs_data().list_documents(filters, page)
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+def get_tcs_risk_document(doc_id: int, include_text: bool = False) -> DocumentDetail:
+    """One TCS risk document by id: silver fields (risk signals with evidence, entities, scores),
+    bronze lineage (url, crawl depth, parent url, query, run id, fetch time, HTTP status; never the
+    raw body) and the gold node (cluster, community, centrality, merged duplicates).
+    ``include_text`` adds the cleaned article text. ``doc_id`` is the bronze/silver/gold id."""
+    from tcs_bot.medallion.read import get_tcs_data
+
+    try:
+        return get_tcs_data().get_document(doc_id, include_text=include_text)
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+def similar_tcs_risks(doc_id: int, k: int = 5) -> SimilarDocuments:
+    """Documents most similar to ``doc_id`` (cosine over the gold embedding, best first, 1-50)."""
+    from tcs_bot.medallion.read import get_tcs_data
+
+    try:
+        return get_tcs_data().similar_documents(doc_id, k=max(1, min(int(k), 50)))
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+def tcs_risk_clusters(cluster_id: int | None = None, kind: str = "cluster") -> dict[str, Any]:
+    """Gold clusters of TCS risk documents. Without ``cluster_id``: every cluster (label, size,
+    top terms, dominant risk categories, mean risk). With it: that cluster plus its member
+    documents. ``kind`` is ``cluster`` (KMeans) or ``community`` (Louvain graph communities)."""
+    from tcs_bot.medallion.read import get_tcs_data
+
+    if kind not in ("cluster", "community"):
+        raise ToolError("validation_error: kind must be 'cluster' or 'community'")
+    try:
+        data = get_tcs_data()
+        if cluster_id is None:
+            clusters = data.list_clusters(kind)  # type: ignore[arg-type]
+            return {"kind": kind, "clusters": [c.model_dump(mode="json") for c in clusters]}
+        return data.get_cluster(cluster_id, kind).model_dump(mode="json")  # type: ignore[arg-type]
     except AppError as exc:
         raise _tool_error(exc) from exc
 

@@ -164,6 +164,15 @@ class FakeES:
         return {"deleted": len(gone)}
 
     # ------------------------------------------------------------------ reads
+    def get(self, index: str, id: str, **_: Any) -> dict[str, Any]:  # noqa: A002 - ES API name
+        """Real-time ``GET``: sees pending (unrefreshed) writes; 404s like ES for index / doc."""
+        self.tick("get")
+        idx = self.index(index)  # missing index -> index_not_found_exception (404)
+        src = idx.pending.get(str(id)) or idx.visible.get(str(id))
+        if src is None:
+            raise api_error(es_exc.NotFoundError, "resource_not_found", 404)
+        return {"_id": str(id), "found": True, "_source": src}
+
     def count(self, index: str, **_: Any) -> dict[str, Any]:
         self.tick("count")
         return {"count": len(self.index(index).visible)}

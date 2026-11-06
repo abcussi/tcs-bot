@@ -50,3 +50,25 @@ from communities where employees/clients discuss TCS. There is no source DB, so 
 - AC-005.10 CLI: `tcs-bot medallion bronze|silver|gold|run [--max-docs N --max-depth D]`; cron entry.
 - AC-005.11 All layers have offline unit tests (fixtures; no network). Integration tests against
   live MySQL/ES are marked `integration`.
+- AC-005.12 Typed read layer: other code reads bronze / silver / gold through `tcs_bot.medallion.read`
+  (`TcsData`, join key `bronze_documents.id == silver doc_id == gold doc_id`), never raw SQL / ES.
+  (a) `list_documents(filters, page)` is silver-backed; filters: category (any of), min severity,
+  min risk score, source, source type, relevant (default true), published date range, gold
+  cluster / community, free text on title / text; sort by risk_score | published_at |
+  tcs_relevance (asc|desc); `limit` <= 100 + `offset` (window <= 10 000); returns the total.
+  (b) `get_document(doc_id)` returns silver fields (risk signals + evidence), bronze lineage (url,
+  depth, parent url, query, run id, fetch time, HTTP status, source) and the gold node (cluster,
+  community, centrality, merged duplicates); bronze `raw_content` and silver `clean_text` only on
+  explicit request (`include_raw` / `include_text`) and never logged. (c) `similar_documents`
+  (ES kNN on the stored gold vector, cosine-ordered, self excluded, merged duplicates resolved to
+  the kept doc), `category_breakdown`, `risk_overview` (ES aggregations by category, severity,
+  source, source type, month + top documents), `list_clusters` / `get_cluster`, `search`.
+  (d) API (prefix `/tcs/risks`, existing routes unchanged): `GET /documents`, `/documents/{doc_id}`,
+  `/documents/{doc_id}/similar`, `/categories`, `/overview`, `/clusters`, `/clusters/{cluster_id}`
+  with typed `response_model`s, validated / capped query params and the JSON error envelope.
+  (e) MCP tools `list_tcs_risks`, `get_tcs_risk_document`, `similar_tcs_risks`,
+  `tcs_risk_clusters` reuse the read layer. (f) Errors: gold missing -> `gold_not_built` (404),
+  unknown id -> `document_not_found` / `cluster_not_found` (404), no vector ->
+  `document_not_in_gold` (404), Elasticsearch down -> `silver_unavailable` /
+  `vector_store_unavailable` (503), MySQL down -> `bronze_unavailable` (503). The read layer never
+  writes to any layer.
