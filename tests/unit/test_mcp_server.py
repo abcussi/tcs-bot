@@ -21,17 +21,33 @@ def _injected(service: ReportService) -> Iterator[None]:
     server.set_service(None)
 
 
-def test_generate_tool_returns_valid_report_dict(service: ReportService) -> None:
-    """AC-003.9: generate_vendor_risk_report returns RiskReport JSON (by id and by name)."""
+def test_generate_tool_returns_valid_report(service: ReportService) -> None:
+    """AC-003.9: generate_vendor_risk_report returns a RiskReport (by id and by name)."""
     service.ingest_document(
         1, DocumentCreate(doc_type="regulatory_filing", title="10-K", content=GOING_CONCERN_DOC)
     )
-    out = server.generate_vendor_risk_report(vendor_id=1, focus_areas=["liquidity"])
-    assert isinstance(out, dict) and isinstance(out["generated_at"], str)
-    report = RiskReport.model_validate(out)
+    report = server.generate_vendor_risk_report(vendor_id=1, focus_areas=["liquidity"])
+    assert isinstance(report, RiskReport)
     assert report.vendor_id == 1 and report.risk_level == "critical"
     by_name = server.generate_vendor_risk_report(vendor_name="Northwind Data Feeds")
-    assert by_name["vendor_id"] == 2
+    assert by_name.vendor_id == 2
+
+
+async def test_generate_tool_output_schema_is_risk_report(service: ReportService) -> None:
+    """AC-003.9: the tool's outputSchema is the RiskReport schema; structuredContent is its JSON."""
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    schema = tools["generate_vendor_risk_report"].output_schema
+    assert schema is not None
+    expected = RiskReport.model_json_schema()
+    assert schema.get("title") == "RiskReport"
+    assert set(schema["properties"]) == set(expected["properties"])
+    # list_vendors keeps working with its (wrapped list) schema
+    assert tools["list_vendors"].output_schema is not None
+
+    result = await server.mcp.call_tool("generate_vendor_risk_report", {"vendor_id": 2})
+    data = result.structured_content
+    assert isinstance(data, dict) and isinstance(data["generated_at"], str)
+    assert RiskReport.model_validate(data).vendor_id == 2
 
 
 def test_tool_errors_are_tool_errors() -> None:

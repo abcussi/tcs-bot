@@ -59,8 +59,11 @@ def test_generate_cache_hit_and_latest(service: ReportService, quotes: FakeQuote
     assert len(service.reports.rows) == 1
 
     cache: InMemoryCache = service.cache  # type: ignore[assignment]
-    key = report_cache_key(1, service.documents.chunks_for_vendor(1), ["liquidity"])
-    assert key.startswith("report:1:") and key.endswith(":liquidity")
+    k = service.settings.rag_top_k
+    key = report_cache_key(
+        1, service.documents.chunks_for_vendor(1), ["liquidity"], k, "fake-heuristic-v1"
+    )
+    assert key.startswith("report:1:") and key.endswith(f":k{k}:fake-heuristic-v1:liquidity")
     assert key in cache.store
 
     second = service.generate_report(req)

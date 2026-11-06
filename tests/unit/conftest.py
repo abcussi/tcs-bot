@@ -83,6 +83,7 @@ class FakeDocumentRepo:
         self.docs: dict[int, VendorDocument] = {}
         self.chunks: dict[int, list[ChunkRecord]] = {}
         self._next = 1
+        self.full_loads = 0  # chunks_for_vendor calls (texts + embeddings)
 
     def add(self, vendor_id: int, doc: DocumentCreate) -> int:
         sha = hashlib.sha256(doc.content.encode()).hexdigest()
@@ -105,7 +106,16 @@ class FakeDocumentRepo:
         ]
         return len(chunks)
 
+    def chunk_ids_for_vendor(self, vendor_id: int) -> list[tuple[int, int]]:
+        return [
+            (did, c.chunk_index)
+            for did in sorted(self.chunks)
+            if self.docs[did].vendor_id == vendor_id
+            for c in self.chunks[did]
+        ]
+
     def chunks_for_vendor(self, vendor_id: int) -> list[ChunkRecord]:
+        self.full_loads += 1
         out: list[ChunkRecord] = []
         for did in sorted(self.chunks):
             if self.docs[did].vendor_id == vendor_id:
@@ -177,15 +187,20 @@ class FakeQuotes:
 
 
 class FakeIndexer:
-    def __init__(self, fail: bool = False) -> None:
+    """``accepted=False`` mimics ``index_chunks`` swallowing ES errors (returns 0)."""
+
+    def __init__(self, fail: bool = False, accepted: bool = True) -> None:
         self.fail = fail
+        self.accepted = accepted
         self.calls: list[tuple[int, int]] = []
+        self.indexed: list[ChunkRecord] = []
 
     def __call__(self, vendor_id: int, chunks: list[ChunkRecord]) -> int:
         if self.fail:
             raise ConnectionError("elasticsearch down")
         self.calls.append((vendor_id, len(chunks)))
-        return len(chunks)
+        self.indexed.extend(chunks)
+        return len(chunks) if self.accepted else 0
 
 
 # ----------------------------------------------------------------------------- fixtures

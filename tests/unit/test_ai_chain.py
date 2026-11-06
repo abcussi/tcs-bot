@@ -56,10 +56,10 @@ def _walk(obj: Any, seen: set[int] | None = None) -> list[Any]:
         return []
     seen.add(id(obj))
     out = [obj]
-    for attr in ("first", "last", "bound"):
+    for attr in ("first", "last", "bound", "runnable"):
         if hasattr(obj, attr):
             out += _walk(getattr(obj, attr), seen)
-    for attr in ("middle", "steps"):
+    for attr in ("middle", "steps", "fallbacks"):
         if isinstance(getattr(obj, attr, None), list):
             for s in getattr(obj, attr):
                 out += _walk(s, seen)
