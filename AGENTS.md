@@ -46,12 +46,13 @@ docker-compose.yml     mysql, redis, elasticsearch, api, crawler
 ```bash
 uv sync                                   # install (workspace incl. crawler)
 uv run vendor-risk-ai all                 # compose up infra -> migrate -> seed -> index -> crawl -> API
-uv run vendor-risk-ai up|migrate|seed|index|crawl|api|mcp|down
-uv run pytest tests/unit crawler/tests    # fast, no infra
+uv run vendor-risk-ai up|down|status|migrate|seed|index|crawl|api|mcp
+uv run vendor-risk-ai all --no-infra      # same pipeline, infra already running
+uv run pytest tests/unit crawler/tests -m "not integration"   # fast, no infra
 uv run pytest -m integration              # needs `uv run vendor-risk-ai up`
 uv run pytest -m e2e                      # full stack
 uv run ruff check . && uv run ruff format --check .
-docker compose up -d --build              # everything in containers
+docker compose --profile app up -d --build   # everything in containers (api+crawler are in the `app` profile; needs .env)
 ```
 
 ## 5. Engineering rules (summary — full list in specs/000-constitution.md)

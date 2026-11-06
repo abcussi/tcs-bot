@@ -59,3 +59,19 @@ def ping() -> bool
 Domain models (`Vendor`, `VendorCreate`, `DocumentCreate`, `VendorDocument`, `ChunkRecord`;
 `StoredReport` is in `schemas/report.py`) live in `schemas/domain.py`.
 `ChunkRecord(document_id:int|None, chunk_index:int, text:str, embedding:list[float]|None, embedding_model:str|None, doc_type:str|None, title:str|None)`.
+
+## Implementation notes (recorded deviations, architect review 2026-11-06)
+- Supersets of the contract (compatible): `TwoTierCache(..., *, key_prefix="vra:", redis_client=None)`,
+  `ping()`, `clear_local()`; `reset_cache()`; `index_chunks(vendor_id, chunks, *, refresh=False)`;
+  `reset_es()`, `chunk_doc_id()`; cursor-level helpers `upsert_vendor_cur`, `add_document_cur`,
+  `write_audit` in `repositories.py` for multi-write transactions (used by `seed`).
+- `transaction()` waits up to `POOL_ACQUIRE_TIMEOUT_S`=10 s for a pooled connection (mysql-connector
+  raises `PoolError` immediately when exhausted; uvicorn's threadpool is 40 > pool 10). Never nest
+  `transaction()` calls in one thread (each holds a connection) — compose with the `*_cur` helpers.
+- `market-quotes` is created by whichever side runs first (`ensure_indices()` here or
+  `gfinance_crawler.sink.ElasticSink.ensure_index()`). Both MUST use the identical mapping
+  (`QUOTES_MAPPING`, currently equal) and identical index settings (1 shard, 0 replicas). The
+  crawler cannot import this package, so parity is enforced by a unit test in `tests/unit` that
+  imports both mappings (open task, specs/002 tasks.md).
+- `vendor-chunks.embedding` is `dense_vector` dims 1536 / cosine: vectors of other lengths are
+  dropped (text kept); all-zero vectors are rejected by ES cosine (partial bulk error, logged).

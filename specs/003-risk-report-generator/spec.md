@@ -16,5 +16,7 @@
 - AC-003.7 Endpoints: `GET /health`, `GET /vendors`, `GET /vendors/{id}`, `POST /vendors/{id}/documents` (JSON text),
   `POST /vendors/{id}/documents/upload` (multipart PDF/txt), `POST /reports` (`{vendor_id, focus_areas?, top_k?, use_cache?}`),
   `GET /reports/{vendor_id}/latest`.
-- AC-003.8 Reports are cached (key includes vendor id + doc fingerprint + focus) and persisted to `risk_reports`.
+- AC-003.8 Reports are cached (key includes vendor id + doc fingerprint + normalized focus + effective top_k
+  + generating model id, so a different `top_k` or a provider switch never serves a stale report) and
+  persisted to `risk_reports`.
 - AC-003.9 MCP server (FastMCP, stdio + streamable-http) exposes tool `generate_vendor_risk_report(vendor_id|vendor_name, focus_areas)` and `list_vendors`.

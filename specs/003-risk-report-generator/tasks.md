@@ -15,3 +15,22 @@ Notes / deviations (to be folded into plan.md by the architect):
 - `with_structured_output(RiskReport, method="function_calling")`: OpenAI strict json_schema rejects RiskReport's defaulted fields.
 - Chain input accepts optional `"data_gaps": list[str]`, which is merged into the report.
 - `embed_all_pending()` returns the number of documents chunked (not the number of chunks).
+
+## Open (architect review 2026-11-06) — owner: developer
+- [ ] AC-003.8: add effective `top_k` and the chain's model id to `report_cache_key`
+      (`services/report_service.py:81`, call site `:303`); today a `top_k=2` report is served for
+      `top_k=10`, and fake-model reports are served from Redis after switching to openai.
+- [ ] `_chunk_and_store` (`services/report_service.py:234-237`): `indexed = indexer(...) > 0`.
+- [ ] Re-embed path: `embed_all_pending(reembed=True)` (or a `reembed` CLI step) that re-embeds and
+      persists chunks whose `embedding_model != embedder.model`, and re-indexes them into ES.
+- [ ] Cache-hit path loads every chunk embedding (`chunks_for_vendor`) just to fingerprint; add a
+      light `DocumentRepository.chunk_ids_for_vendor(vendor_id)` (or fingerprint query) for the key.
+- [ ] AC-003.5: wire `build_report_chain_with_parser` as `.with_fallbacks([...])` on the
+      structured chain (it is currently dead code), or drop the AC wording.
+- [ ] Pin constitution values: validate `openai_temperature == 0.0`, `openai_chat_model ==
+      "gpt-4.1-mini"`, `openai_embedding_model == "text-embedding-3-small"` in `config.py`
+      (env can currently override them; a 3072-dim model would break embeddings and ES dims).
+- [ ] MCP: annotate `generate_vendor_risk_report(...) -> RiskReport` for a typed outputSchema.
+- [ ] Constitution §6: `latest_quote` swallows ES errors and returns None, so ES-down reads as
+      "No market quote found" — return a sentinel / raise so the service emits the explicit
+      "Market data unavailable (search backend error)" gap (service branch `:340-346` is dead).
