@@ -1,7 +1,7 @@
 """Gold read side: `/tcs/risks/*` routes and the MCP tools (AC-005.9), offline.
 
-Gold is built from the SYNTHETIC corpus into ``tmp_path`` (``GOLD_DIR``) with an in-process
-Qdrant injected via ``search.set_vector_store``."""
+Gold is built from the SYNTHETIC corpus into ``tmp_path`` (``GOLD_DIR``) with an in-memory
+fake ES store injected via ``search.set_vector_store``."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from qdrant_client import QdrantClient
 
 from tcs_bot.api.app import create_app
 from tcs_bot.config import get_settings
@@ -21,6 +20,7 @@ from tcs_bot.medallion.gold.vector_store import GoldVectorStore
 from tcs_bot.medallion.models import GoldHit
 from tcs_bot.services.report_service import ReportService
 
+from .fake_es import DownES, FakeES
 from .test_gold_synthetic import FakeSilverStore, synthetic_records
 
 HEALTHY = {"mysql": lambda: True, "redis": lambda: True, "elasticsearch": lambda: True}
@@ -30,7 +30,7 @@ HEALTHY = {"mysql": lambda: True, "redis": lambda: True, "elasticsearch": lambda
 def gold_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[GoldVectorStore]:
     monkeypatch.setenv("GOLD_DIR", str(tmp_path / "gold"))
     get_settings.cache_clear()
-    vs = GoldVectorStore(client=QdrantClient(":memory:"))
+    vs = GoldVectorStore(es=FakeES(), prefix="gold-tcs-risk")
     search.set_vector_store(vs)
     yield vs
     search.set_vector_store(None)
@@ -90,14 +90,10 @@ def test_search_validation(built: dict, client: TestClient) -> None:
     assert client.get("/tcs/risks/search", params={"q": "zzzqx"}).json() == []
 
 
-def test_search_maps_qdrant_failure_to_503(built: dict, client: TestClient) -> None:
-    class Down:
-        def __getattr__(self, name):
-            raise ConnectionError("qdrant down")
-
-    search.set_vector_store(GoldVectorStore(client=Down()))  # type: ignore[arg-type]
+def test_search_maps_elasticsearch_failure_to_503(built: dict, client: TestClient) -> None:
+    search.set_vector_store(GoldVectorStore(es=DownES(), prefix="gold-tcs-risk"))  # type: ignore[arg-type]
     r = client.get("/tcs/risks/search", params={"q": "breach"})
-    assert r.status_code == 503 and r.json()["error"]["code"] == "qdrant_unavailable"
+    assert r.status_code == 503 and r.json()["error"]["code"] == "vector_store_unavailable"
 
 
 def test_mcp_tools(built: dict) -> None:

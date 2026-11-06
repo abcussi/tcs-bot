@@ -91,6 +91,22 @@
 - Note: `llm_extract(doc, text, settings, base=None, chain=None)` takes the extracted text
   explicitly (plan listed `llm_extract(doc, settings)`).
 
+## GOLD vector store (`src/tcs_bot/medallion/gold/vector_store.py`, owner: agent GOLD)
+- [x] Vector storage moved from Qdrant to Elasticsearch `dense_vector` kNN; Qdrant dropped entirely
+      (dependency, `QDRANT_URL`, compose service + volume, CI service + wait step). (AC-005.7)
+- [x] `GoldVectorStore(es=None, model_slug, prefix)`: indices `gold-tcs-risk-{docs,chunks}--<model>`
+      (`GOLD_INDEX_PREFIX`), cosine `dense_vector` (hnsw, <= 4096 dims), `ensure(dim, recreate)`,
+      bulk upsert with deterministic `_id` + refresh, per-doc failures in `last_failed_ids`,
+      `search(...)` with kNN pre-filters (category, min risk, source, source type, cluster,
+      community), `count`, `stats`, `delete_docs`, `drop`. ES failures -> `DependencyUnavailable`
+      (`vector_store_unavailable`), missing index -> `NotFoundError` (`gold_not_built`). (AC-005.7/.9)
+- [x] `run_gold` result/meta key `qdrant` -> `vector_store` (`ok` / `partial: ...` / `unavailable: ...`
+      / `skipped: ...`), meta `vector_indices` + `vector_backend`; viz shows "Vector store".
+- [x] Tests: `tests/unit/fake_es.py` (in-memory ES fake enforcing dims, zero-vector rejection,
+      knn limits, refresh visibility), `tests/unit/test_gold_vector_store.py`, gold pipeline/API/MCP
+      tests moved to the fake; `tests/integration/test_gold_vector_es.py` (throwaway
+      `gold-test-<uuid>` indices, deleted after).
+
 ## Verification log
 - SILVER verified by lead (lint clean; 68 unit + 2 integration tests pass against live ES).
   Not yet run against real bronze rows: `bronze_documents` needs migration 002 applied.

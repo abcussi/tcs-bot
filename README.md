@@ -67,10 +67,10 @@ ESG and geopolitical/immigration. Limits: crawl depth <= 2, <= 500 documents per
 |---|---|---|---|
 | Bronze | MySQL `bronze_documents`, `crawl_runs` | `crawler/src/gfinance_crawler/news/`, `medallion/bronze.py` | Raw documents as fetched, with crawl lineage (query, parent URL, depth, run id) |
 | Silver | Elasticsearch `silver-tcs-risk` | `medallion/silver/` | Clean text, entities, sentiment, TCS relevance, risk signals by category, risk score 0-100 |
-| Gold | Qdrant `gold_tcs_risk_{docs,chunks}__<model>` + `data/gold/` | `medallion/gold/` | Embeddings, cosine k-NN graph, Louvain/KMeans clusters, interactive graph |
+| Gold | Elasticsearch kNN `gold-tcs-risk-{docs,chunks}--<model>` + `data/gold/` | `medallion/gold/` | Embeddings, cosine k-NN graph, Louvain/KMeans clusters, interactive graph |
 
 ```bash
-docker compose up -d mysql redis elasticsearch qdrant
+docker compose up -d mysql redis elasticsearch
 uv run tcs-bot migrate && uv run tcs-bot seed && uv run tcs-bot index
 uv run tcs-bot medallion run --max-docs 50 --max-depth 2   # bronze -> silver -> gold
 uv run tcs-bot medallion bronze|silver|gold                # one layer at a time
@@ -83,8 +83,10 @@ The same data is served at `GET /tcs/risks/{search?q=&k=,summary,graph}` and by 
 `search_tcs_risks`.
 
 **Embeddings:** OpenAI `text-embedding-3-small` when `OPENAI_API_KEY` is set and
-`LLM_PROVIDER=openai`; otherwise an offline TF-IDF+SVD ("LSA") embedder. Collection names include the
-model, so vector spaces never mix. Tune the graph with `GOLD_GRAPH_K` and `GOLD_GRAPH_MIN_COSINE`,
+`LLM_PROVIDER=openai`; otherwise an offline TF-IDF+SVD ("LSA") embedder. Index names include the
+model, so vector spaces never mix. Gold vectors are Elasticsearch `dense_vector` fields (cosine, up
+to 4096 dims, so LSA 256 and OpenAI 1536 both fit) searched with the `knn` API; the index prefix is
+`GOLD_INDEX_PREFIX`. Tune the graph with `GOLD_GRAPH_K` and `GOLD_GRAPH_MIN_COSINE`,
 and the relevance filter with `MEDALLION_RELEVANCE_THRESHOLD`.
 
 **Sources and politeness:** Bing News RSS, GDELT, Hacker News and the local inbox work. robots.txt is
@@ -106,7 +108,7 @@ OPENAI_API_KEY=sk-... uv run pytest -m openai   # real-model smoke test
 ```
 
 ### CI (`.github/workflows/ci.yml`)
-Every push/PR: ruff + unit tests with coverage -> integration + e2e against MySQL/Redis/Elasticsearch/Qdrant
+Every push/PR: ruff + unit tests with coverage -> integration + e2e against MySQL/Redis/Elasticsearch
 service containers -> Docker image builds. Add the repository secret `OPENAI_API_KEY`
 (Settings -> Secrets and variables -> Actions) to also run the real gpt-4.1-mini smoke test.
 

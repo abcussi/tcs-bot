@@ -19,7 +19,7 @@ from tcs_bot.logging_setup import configure_logging, get_logger
 
 log = get_logger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
-INFRA_SERVICES = ["mysql", "redis", "elasticsearch", "qdrant"]
+INFRA_SERVICES = ["mysql", "redis", "elasticsearch"]
 
 
 # ---------------------------------------------------------------- infra
@@ -123,7 +123,7 @@ def step_mcp() -> None:
 def step_medallion(
     layer: str, max_docs: int | None, max_depth: int | None, cron: str | None
 ) -> int:
-    """TCS risk medallion pipeline (spec 005): bronze (MySQL) -> silver (ES) -> gold (Qdrant)."""
+    """TCS risk medallion pipeline (spec 005): bronze (MySQL) -> silver (ES) -> gold (ES kNN)."""
     import json
 
     from tcs_bot.medallion import pipeline

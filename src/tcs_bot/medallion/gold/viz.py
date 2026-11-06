@@ -372,7 +372,7 @@ function rebuildLinks() {
     'k-NN graph k=' + (META.graph_k || '–') + ', cosine ≥ ' + fmt(META.graph_min_cosine)]);
   if (META.synthetic) $('h-title').appendChild(el('span', { cls: 'badge', text: 'SYNTHETIC DATA' }));
   $('h-source').textContent = 'Data source: ' + (META.data_source || 'unknown') +
-    (META.qdrant ? ' · Qdrant: ' + META.qdrant : '');
+    (META.vector_store ? ' · Vector store: ' + META.vector_store : '');
   var tiles = [
     [META.n_docs || 0, 'documents'], [META.n_chunks || 0, 'chunks'], [META.n_edges || 0, 'edges'],
     [META.n_clusters || 0, 'clusters'], [META.n_communities || 0, 'communities'],
@@ -780,7 +780,7 @@ function renderOverview(box) {
   var dl = el('dl', { cls: 'kv' });
   [['Embedding model', META.embedding_model], ['KMeans k', km.k], ['Silhouette (cosine)', km.silhouette !== null && km.silhouette !== undefined ? fmt(km.silhouette) : '–'],
    ['Louvain communities', META.n_communities], ['Graph', META.graph_k !== undefined ? 'k=' + META.graph_k + ', cosine ≥ ' + fmt(META.graph_min_cosine) : '–'],
-   ['Qdrant', META.qdrant || '–']].forEach(function (r) { dl.appendChild(el('dt', { text: r[0] })); dl.appendChild(el('dd', { text: String(r[1] === undefined ? '–' : r[1]) })); });
+   ['Vector store', META.vector_store || '–']].forEach(function (r) { dl.appendChild(el('dt', { text: r[0] })); dl.appendChild(el('dd', { text: String(r[1] === undefined ? '–' : r[1]) })); });
   box.appendChild(dl);
   var deg = function (n) { return adj.get(n).size; };
   var central = nodes.slice().sort(function (a, b) { return deg(b) - deg(a) || (b.betweenness || 0) - (a.betweenness || 0) || (b.risk_score || 0) - (a.risk_score || 0); }).slice(0, 10);

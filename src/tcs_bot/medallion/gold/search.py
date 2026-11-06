@@ -1,4 +1,4 @@
-"""Gold read side (AC-005.9): semantic search over Qdrant + the persisted graph artifacts.
+"""Gold read side (AC-005.9): semantic search over the ES kNN index + the persisted graph artifacts.
 
 The query is embedded with the same model gold was built with (``summary.json`` ->
 ``meta.embedding_model``): the persisted ``lsa.pkl`` for LSA, OpenAI otherwise.
@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from tcs_bot.errors import DependencyUnavailable, NotFoundError
+from tcs_bot.errors import AppError, DependencyUnavailable, NotFoundError
 from tcs_bot.logging_setup import get_logger
 from tcs_bot.medallion.gold.embedder import LsaEmbedder, model_slug
 from tcs_bot.medallion.gold.pipeline import GRAPH_HTML, GRAPH_JSON, LSA_PKL, SUMMARY_JSON
@@ -34,7 +34,7 @@ _lsa_cache: dict[str, tuple[float, LsaEmbedder]] = {}
 
 
 def set_vector_store(store: GoldVectorStore | None) -> None:
-    """Inject a vector store (tests: ``QdrantClient(":memory:")``); ``None`` resets."""
+    """Inject a vector store (tests: a store on an in-memory fake ES); ``None`` resets."""
     global _vector_store
     _vector_store = store
 
@@ -44,7 +44,7 @@ def get_vector_store(settings: Settings | None = None) -> GoldVectorStore:
     with _lock:
         if _vector_store is None:
             settings = settings or _settings()
-            _vector_store = GoldVectorStore(url=settings.qdrant_url)
+            _vector_store = GoldVectorStore(prefix=settings.gold_index_prefix)
         return _vector_store
 
 
@@ -147,11 +147,14 @@ def search_risks(
             min_risk=min_risk,
             level="docs" if level == "docs" else "chunks",
         )
+    except AppError:  # DependencyUnavailable / NotFoundError from the store
+        raise
     except Exception as exc:
         log.error("gold.search_failed", error_type=type(exc).__name__)
         raise DependencyUnavailable(
-            f"Qdrant search failed ({type(exc).__name__}); is Qdrant up and gold built? {RUN_HINT}",
-            code="qdrant_unavailable",
+            f"vector search failed ({type(exc).__name__}); is Elasticsearch up and gold built? "
+            f"{RUN_HINT}",
+            code="vector_store_unavailable",
         ) from exc
     if dedupe:
         best: dict[int, GoldHit] = {}

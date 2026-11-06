@@ -1,5 +1,5 @@
 """Gold pipeline end to end + the self-contained HTML (AC-005.7, AC-005.8), all offline:
-fake silver store, in-process Qdrant, artifacts into ``tmp_path``."""
+fake silver store, in-memory fake ES, artifacts into ``tmp_path``."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from pathlib import Path
 
 import networkx as nx
 import pytest
-from qdrant_client import QdrantClient
 
 from tcs_bot.config import Settings
 from tcs_bot.medallion.gold.pipeline import run_gold
 from tcs_bot.medallion.gold.vector_store import GoldVectorStore
 from tcs_bot.medallion.gold.viz import embed_json, render_html
 
+from .fake_es import DownES, FakeES
 from .test_gold_synthetic import FakeSilverStore, synthetic_records, topic_of
 
 ARTIFACTS = ("graph.json", "summary.json", "graph.graphml", "tcs_risk_graph.html", "lsa.pkl")
@@ -29,15 +29,15 @@ def _embedded(html: str) -> dict:
 
 @pytest.fixture
 def vs() -> GoldVectorStore:
-    return GoldVectorStore(client=QdrantClient(":memory:"))
+    return GoldVectorStore(es=FakeES(), prefix="gold-tcs-risk")
 
 
 def test_run_gold_end_to_end(tmp_path: Path, vs: GoldVectorStore, settings: Settings) -> None:
-    """AC-005.7/8: silver -> LSA -> Qdrant (docs + chunks) + graph/summary/graphml/html."""
+    """AC-005.7/8: silver -> LSA -> ES kNN index (docs + chunks) + graph/summary/graphml/html."""
     records = synthetic_records()
     res = run_gold(FakeSilverStore(records), vs, settings, out_dir=tmp_path)
     assert res["docs"] == 30 and res["chunks"] >= 30
-    assert res["qdrant"] == "ok" and res["clusters"] == 3
+    assert res["vector_store"] == "ok" and res["clusters"] == 3
     assert res["embedding_model"] == f"lsa-{settings.lsa_dim}"
     for name in ARTIFACTS:
         assert (tmp_path / name).is_file(), name
@@ -51,7 +51,7 @@ def test_run_gold_end_to_end(tmp_path: Path, vs: GoldVectorStore, settings: Sett
         assert key in node
     assert node["neighbors"] and node["signals"][0]["evidence"]
     assert graph["meta"]["synthetic"] is True and "SYNTHETIC" in graph["meta"]["data_source"]
-    # clusters in the Qdrant payload match graph.json
+    # clusters in the vector-store payload match graph.json
     topic_cluster = {
         (topic_of(r), n["cluster"]) for r, n in zip(records, graph["nodes"], strict=True)
     }
@@ -81,7 +81,7 @@ def test_run_gold_tiny_corpora(tmp_path: Path, vs: GoldVectorStore, settings, n:
     graph = json.loads((tmp_path / "graph.json").read_text())
     assert len(graph["nodes"]) == n
     assert (tmp_path / "tcs_risk_graph.html").is_file()
-    assert res["qdrant"] == ("skipped: no documents" if n == 0 else "ok")
+    assert res["vector_store"] == ("skipped: no documents" if n == 0 else "ok")
 
 
 def test_run_gold_skips_irrelevant_and_duplicates(tmp_path, vs, settings) -> None:
@@ -92,21 +92,20 @@ def test_run_gold_skips_irrelevant_and_duplicates(tmp_path, vs, settings) -> Non
     assert res["docs"] == 5
 
 
-def test_run_gold_degrades_when_qdrant_is_down(tmp_path, settings) -> None:
-    """Constitution §6: Qdrant down -> artifacts still written, status explains."""
-
-    class Down:
-        def __getattr__(self, name):
-            raise ConnectionError("qdrant down")
+def test_run_gold_degrades_when_elasticsearch_is_down(tmp_path, settings) -> None:
+    """Constitution §6: ES down -> artifacts still written, status explains."""
 
     res = run_gold(
         FakeSilverStore(synthetic_records()[:9]),
-        GoldVectorStore(client=Down()),  # type: ignore[arg-type]
+        GoldVectorStore(es=DownES(), prefix="gold-tcs-risk"),  # type: ignore[arg-type]
         settings,
         out_dir=tmp_path,
     )
-    assert res["qdrant"].startswith("unavailable: ConnectionError")
-    assert json.loads((tmp_path / "summary.json").read_text())["meta"]["qdrant"] == res["qdrant"]
+    assert res["vector_store"].startswith("unavailable: DependencyUnavailable")
+    assert (
+        json.loads((tmp_path / "summary.json").read_text())["meta"]["vector_store"]
+        == res["vector_store"]
+    )
     assert (tmp_path / "tcs_risk_graph.html").is_file()
 
 

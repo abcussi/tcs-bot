@@ -36,6 +36,7 @@ src/tcs_bot/
   llm/                 LCEL chain: ChatPromptTemplate | ChatOpenAI(gpt-4.1-mini, T=0).with_structured_output
   services/            ReportService — orchestrates retrieval + LLM + persistence + cache
   mcp_server/          FastMCP server exposing `generate_vendor_risk_report`
+  medallion/           TCS risk bronze (MySQL) -> silver (ES) -> gold (ES dense_vector kNN + graph); spec 005
 crawler/               Separate uv workspace member `gfinance-crawler` (Google Finance -> ES), cron
 data/seed/             Synthetic, anonymized vendor profiles + documents (fallback seed is built-in)
 specs/                 SDD specs (constitution + features)

@@ -1,6 +1,6 @@
-"""Gold pipeline (AC-005.7, AC-005.8): silver -> embeddings -> Qdrant + graph analytics + viz.
+"""Gold pipeline (AC-005.7, AC-005.8): silver -> embeddings -> ES kNN index + graph analytics + viz.
 
-Gold is a full rebuild from the relevant silver documents on every run: the Qdrant collections of
+Gold is a full rebuild from the relevant silver documents on every run: the Elasticsearch indices of
 the active embedding model are recreated (an LSA model is refit per run, so its vector space
 changes) and every artifact in ``gold_dir`` is rewritten.
 """
@@ -43,7 +43,7 @@ EMBED_LEAD_WORDS = 150
 EMBED_TITLE_WEIGHT = 3
 DATA_SOURCE_NOTE = (
     "Public news & community posts about TCS crawled by the medallion pipeline "
-    "(bronze MySQL -> silver Elasticsearch -> gold Qdrant). Risk labels are automated."
+    "(bronze MySQL -> silver Elasticsearch -> gold Elasticsearch). Risk labels are automated."
 )
 
 
@@ -248,9 +248,10 @@ def run_gold(
     out_dir: str | Path | None = None,
     embedder: Embedder | None = None,
 ) -> dict[str, Any]:
-    """Build gold from relevant silver docs. Returns counts, artifact paths and Qdrant status.
+    """Build gold from relevant silver docs. Returns counts, artifact paths and vector-store status.
 
-    Qdrant being down degrades: file artifacts are still written, ``result["qdrant"]`` says why.
+    Elasticsearch failing degrades: file artifacts are still written, ``result["vector_store"]``
+    says why (``ok`` / ``partial: ...`` / ``unavailable: ...`` / ``skipped: ...``).
     """
     if settings is None:
         from tcs_bot.config import get_settings
@@ -284,10 +285,10 @@ def run_gold(
         records, X, texts, settings, embedder.model, len(chunks), merged=dd.merged
     )
 
-    qdrant_status = "skipped: no documents"
+    vector_status = "skipped: no documents"
     upserted = {"docs": 0, "chunks": 0}
     if records:
-        vs = (vector_store or GoldVectorStore(url=settings.qdrant_url)).with_model(slug)
+        vs = (vector_store or GoldVectorStore()).with_model(slug)
         extra = {
             n["id"]: {"cluster": n["cluster"], "community": n["community"]}
             for n in graph_json["nodes"]
@@ -295,13 +296,16 @@ def run_gold(
         try:
             vs.ensure(embedder.dim, recreate=True)
             upserted["docs"] = vs.upsert_docs(records, X, extra)
+            failed = set(vs.last_failed_ids)
             upserted["chunks"] = vs.upsert_chunks(chunks, Xc, extra)
-            qdrant_status = "ok"
-            graph_json["meta"]["qdrant_collections"] = [vs.docs_collection, vs.chunks_collection]
+            failed |= vs.last_failed_ids
+            vector_status = "ok" if not failed else f"partial: {len(failed)} documents failed"
+            graph_json["meta"]["vector_indices"] = [vs.docs_collection, vs.chunks_collection]
         except Exception as exc:  # degrade: artifacts are still useful offline
-            qdrant_status = f"unavailable: {type(exc).__name__}: {exc}"[:300]
-            log.error("gold.qdrant_failed", error_type=type(exc).__name__)
-    graph_json["meta"]["qdrant"] = qdrant_status
+            vector_status = f"unavailable: {type(exc).__name__}: {exc}"[:300]
+            log.error("gold.vector_store_failed", error_type=type(exc).__name__)
+    graph_json["meta"]["vector_backend"] = "elasticsearch"
+    graph_json["meta"]["vector_store"] = vector_status
 
     paths: dict[str, str] = {}
     if isinstance(embedder, LsaEmbedder):
@@ -322,7 +326,7 @@ def run_gold(
         "clusters": graph_json["meta"]["n_clusters"],
         "communities": graph_json["meta"]["n_communities"],
         "embedding_model": embedder.model,
-        "qdrant": qdrant_status,
+        "vector_store": vector_status,
         "upserted": upserted,
         "paths": paths,
     }

@@ -1,7 +1,7 @@
 """Gold embedders (AC-005.7): OpenAI ``text-embedding-3-small`` or an offline LSA embedder.
 
 The LSA embedder is TF-IDF (unigrams) followed by a truncated SVD, fitted on the gold
-corpus. Vectors are L2-normalized and zero-padded to ``dim`` so the Qdrant collection dimension
+corpus. Vectors are L2-normalized and zero-padded to ``dim`` so the Elasticsearch index dimension
 is stable whatever the corpus size.
 """
 

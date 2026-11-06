@@ -17,7 +17,7 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
         "description": "Gold not built yet (run `tcs-bot medallion run`)",
     },
     422: {"model": ErrorEnvelope, "description": "Validation error"},
-    503: {"model": ErrorEnvelope, "description": "Qdrant / embedder unavailable"},
+    503: {"model": ErrorEnvelope, "description": "Elasticsearch / embedder unavailable"},
 }
 
 router = APIRouter(prefix="/tcs/risks", tags=["tcs-risk"], responses=_ERRORS)

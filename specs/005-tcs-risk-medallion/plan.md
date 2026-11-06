@@ -43,7 +43,9 @@ silver/      extract.py  def extract_main_text(raw: str, content_type: str, url:
                          #          attribute_risk(risk_score, relevance, threshold) -> float
              classify.py also: title_names_tcs(title) -> bool; length_damping(words) -> float
 gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts)  # unigram TF-IDF + SVD rank min(dim, n-1, max(6, 0.3 n)); get_gold_embedder(settings, corpus) -> Embedder-like
-             vector_store.py class GoldVectorStore(url, model): ensure(dim); upsert_docs/upsert_chunks; search(vector, k, filters) -> list[GoldHit]
+             vector_store.py class GoldVectorStore(es=None, model_slug, prefix): ensure(dim, recreate=False); upsert_docs/upsert_chunks -> int (+ last_failed_ids);
+                           search(vector, k, categories, min_risk, level, *, sources, source_types, cluster, community) -> list[GoldHit]  # ES knn + pre-filter, score = cosine
+                           count(level); stats(); delete_docs(doc_ids); drop(); errors -> DependencyUnavailable('vector_store_unavailable') / NotFoundError('gold_not_built')
              analytics.py cosine_matrix(X); knn_graph(X, ids, k, threshold) -> nx.Graph; kmeans_clusters(X, k_range=None, seed, min_size=2) -> (labels, info); louvain_communities(G, seed, resolution=1.0, min_size=2);
                           cluster_summaries(X, labels, records, texts, S=None) -> list[ClusterSummary]; project_2d(X)
                           suggest_k(n)=clamp(round(sqrt(n/2)),2,12); graph_params(n, k, min_cosine) -> (k_eff<=round(sqrt(n)), min_cosine)
@@ -59,4 +61,9 @@ gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts)  # unigram TF-ID
   depth TINYINT, source VARCHAR(32), source_type ENUM('news','community','corporate','other'), query VARCHAR(255),
   title TEXT NULL, raw_content MEDIUMTEXT, content_type VARCHAR(64), http_status SMALLINT, published_at DATETIME NULL,
   fetched_at DATETIME, content_sha256 CHAR(64), silver_processed_at DATETIME NULL)`.
-- ES `silver-tcs-risk` (mapping in silver/store.py). Qdrant `gold_tcs_risk_{docs|chunks}__{model_slug}` cosine.
+- ES `silver-tcs-risk` (mapping in silver/store.py). ES `gold-tcs-risk-{docs|chunks}--{model_slug}` (prefix `GOLD_INDEX_PREFIX`): `dynamic: false`, 1 shard / 0 replicas,
+  `embedding` = `dense_vector{dims, index: true, similarity: cosine, index_options: hnsw}` (ES 8.15 caps indexed
+  dense_vector at 4096 dims and rejects zero-magnitude vectors under cosine), keyword `risk_categories/source/source_type/domain/url`,
+  numeric `doc_id/chunk_index/cluster/community/risk_score/sentiment`, date `published_at`, text `title/text`.
+  `_id` = `doc_id` (docs) / `doc_id:chunk_index` (chunks); bulk upsert then `indices.refresh`. ES `knn` score is
+  `(1+cos)/2`, mapped back to cosine in `GoldHit.score`. Qdrant was dropped (no dual backend).

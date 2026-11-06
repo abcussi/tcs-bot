@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     seed_file: str = "data/seed/vendors.json"
 
     # TCS risk medallion pipeline (spec 005)
-    qdrant_url: str = "http://127.0.0.1:6333"
+    gold_index_prefix: str = "gold-tcs-risk"  # ES indices <prefix>-{docs,chunks}--<model_slug>
     medallion_max_docs: int = Field(default=500, ge=1, le=500)
     medallion_max_depth: int = Field(default=2, ge=0, le=2)
     medallion_relevance_threshold: float = 0.35

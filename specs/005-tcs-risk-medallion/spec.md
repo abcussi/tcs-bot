@@ -10,7 +10,7 @@ from communities where employees/clients discuss TCS. There is no source DB, so 
 - **Bronze (MySQL, unstructured, immutable):** raw documents exactly as fetched (HTML/JSON/XML +
   HTTP metadata, crawl lineage: query, parent URL, depth, run id).
 - **Silver (Elasticsearch, structured):** cleaned text + extracted fields + risk classification.
-- **Gold / prod (Qdrant vector DB + analytics):** chunk & document embeddings, clusters, cosine
+- **Gold / prod (Elasticsearch dense_vector kNN + analytics):** chunk & document embeddings, clusters, cosine
   similarity graph, cluster/risk summaries, interactive graph visualization.
 
 ## Acceptance criteria
@@ -34,9 +34,12 @@ from communities where employees/clients discuss TCS. There is no source DB, so 
 - AC-005.6 Docs below the relevance threshold are marked `relevant=false` in silver (kept for audit,
   excluded from gold).
 - AC-005.7 Gold: chunk relevant silver docs, embed (OpenAI text-embedding-3-small when configured,
-  else offline TF-IDF+SVD "LSA" embedder), upsert into Qdrant collections
-  `gold_tcs_risk_chunks` and `gold_tcs_risk_docs` with rich payloads. Collection name includes the
-  embedding model to avoid mixing vector spaces.
+  else offline TF-IDF+SVD "LSA" embedder), bulk-upsert into Elasticsearch indices
+  `gold-tcs-risk-chunks--<model>` and `gold-tcs-risk-docs--<model>` (`dense_vector`, cosine,
+  `index=true`, <= 4096 dims) with rich payloads and deterministic `_id`s (idempotent). The index
+  name includes the embedding model to avoid mixing vector spaces. Qdrant is not used. ES errors
+  surface as `DependencyUnavailable` (`vector_store_unavailable`, 503); the pipeline still writes
+  the file artifacts and reports `vector_store: unavailable: ...`.
 - AC-005.8 Analytics: numpy cosine similarity matrix over doc vectors; k-NN similarity graph
   (edges = cosine >= threshold, max k neighbours) with networkx; Louvain communities + KMeans
   clusters; centrality; 2-D projection (PCA); per-cluster top terms, dominant risk categories,
@@ -46,4 +49,4 @@ from communities where employees/clients discuss TCS. There is no source DB, so 
   `GET /tcs/risks/graph`; MCP tool `search_tcs_risks(query, k)`.
 - AC-005.10 CLI: `tcs-bot medallion bronze|silver|gold|run [--max-docs N --max-depth D]`; cron entry.
 - AC-005.11 All layers have offline unit tests (fixtures; no network). Integration tests against
-  live MySQL/ES/Qdrant are marked `integration`.
+  live MySQL/ES are marked `integration`.

@@ -12,7 +12,6 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 import pytest
-from qdrant_client import QdrantClient
 from sklearn.metrics import adjusted_rand_score
 
 from tcs_bot.config import Settings
@@ -23,6 +22,7 @@ from tcs_bot.medallion.gold.pipeline import EMBED_TITLE_WEIGHT, embedding_text, 
 from tcs_bot.medallion.gold.vector_store import GoldVectorStore
 from tcs_bot.medallion.models import RiskSignal, SilverRecord
 
+from .fake_es import FakeES
 from .test_gold_synthetic import FakeSilverStore
 
 MARKER = "SYNTHETIC FIXTURE"
@@ -338,7 +338,7 @@ def test_label_prefixes_dominant_category_only_when_strong(corpus) -> None:
 # ---------------------------------------------------------------------- pipeline
 @pytest.fixture
 def vs() -> GoldVectorStore:
-    return GoldVectorStore(client=QdrantClient(":memory:"))
+    return GoldVectorStore(es=FakeES(), prefix="gold-tcs-risk")
 
 
 def test_run_gold_dedupes_groups_and_reports_merges(
@@ -370,7 +370,7 @@ def test_run_gold_dedupes_groups_and_reports_merges(
     assert node["merged_sources"][0]["source"] == "synthetic_snippet"
     assert all(n["also_seen_in"] == 0 for n in graph["nodes"] if n["id"] != dup_src.doc_id)
     assert 900 not in {n["id"] for n in graph["nodes"]}
-    # merged ids are not indexed in Qdrant either
+    # merged ids are not indexed in the vector store either
     live = vs.with_model(f"lsa_{settings.lsa_dim}")
     assert live.count("docs") == len(recs)
     # groups: every edge stays within one topic, no singleton cluster / community
