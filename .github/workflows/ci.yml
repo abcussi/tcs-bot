@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.11.32"
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint-unit:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Unit tests (app + crawler, no infra)
+        run: uv run pytest tests/unit crawler/tests -m "not integration" --cov=src/tcs_bot --cov=crawler/src --cov-report=term-missing:skip-covered
+
+  integration-e2e:
+    name: Integration + e2e (MySQL, Redis, Elasticsearch)
+    runs-on: ubuntu-latest
+    needs: lint-unit
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: vendor_risk
+          MYSQL_USER: vendor_risk
+          MYSQL_PASSWORD: vendor_risk_pw
+          MYSQL_ROOT_PASSWORD: root_pw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot_pw"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-retries 20
+      elasticsearch:
+        image: elasticsearch:8.15.3
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1"
+          --health-interval 10s --health-retries 30
+    env:
+      LLM_PROVIDER: fake
+      MYSQL_HOST: 127.0.0.1
+      REDIS_URL: redis://127.0.0.1:6379/0
+      ELASTIC_URL: http://127.0.0.1:9200
+      E2E_BASE_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Migrate, seed, index (idempotent pipeline steps)
+        run: |
+          uv run tcs-bot migrate
+          uv run tcs-bot seed
+          uv run tcs-bot index
+      - name: Start API
+        run: |
+          nohup uv run tcs-bot api > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8000/health && exit 0; sleep 2; done
+          cat api.log; exit 1
+      - name: Integration tests
+        run: uv run pytest -m integration -q
+      - name: E2E tests (HTTP API + MCP stdio)
+        run: uv run pytest -m e2e -q
+      - name: API log
+        if: failure()
+        run: cat api.log
+
+  openai-smoke:
+    name: OpenAI smoke test (only when secret is set)
+    runs-on: ubuntu-latest
+    needs: lint-unit
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_PROVIDER: openai
+    steps:
+      - uses: actions/checkout@v4
+        if: env.OPENAI_API_KEY != ''
+      - uses: astral-sh/setup-uv@v6
+        if: env.OPENAI_API_KEY != ''
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - if: env.OPENAI_API_KEY != ''
+        run: uv sync --locked && uv run pytest -m openai -q
+      - if: env.OPENAI_API_KEY == ''
+        run: echo "OPENAI_API_KEY secret not set — skipping real-model smoke test."
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: lint-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: tcs-bot-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Crawler image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: crawler/Dockerfile
+          push: false
+          tags: tcs-bot-crawler:ci
+          cache-from: type=gha,scope=crawler
+          cache-to: type=gha,mode=max,scope=crawler
+      - name: Compose file is valid
+        run: cp .env.example .env && docker compose --profile app config -q
