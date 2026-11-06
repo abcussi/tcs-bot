@@ -84,7 +84,7 @@ class GoldVectorStore:
                 from tcs_bot.config import get_settings
 
                 url = get_settings().qdrant_url
-            client = QdrantClient(url=url, timeout=timeout)
+            client = QdrantClient(url=url, timeout=timeout, check_compatibility=False)
         self.client = client
         self.model_slug = model_slug
         self.prefix = prefix

@@ -35,7 +35,7 @@ def settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Settin
 def live_vs(settings: Settings) -> Iterator[GoldVectorStore]:
     from qdrant_client import QdrantClient
 
-    client = QdrantClient(url=settings.qdrant_url, timeout=5)
+    client = QdrantClient(url=settings.qdrant_url, timeout=5, check_compatibility=False)
     try:
         client.get_collections()
     except Exception as exc:
