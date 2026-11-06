@@ -269,7 +269,8 @@ class RiskCrawler:
         if not is_tcs_relevant(f"{title or ''} {visible_text(res.text, res.content_type)}"):
             self._stats["skipped_irrelevant"] += 1
             return None
-        default_type = parent.source_type if parent.source_type != "other" else "news"
+        inherit = depth == 1 and parent.source_type != "other"
+        default_type = parent.source_type if inherit else "news"
         return RawDocument(
             url=res.final_url,
             canonical_url=final_key,

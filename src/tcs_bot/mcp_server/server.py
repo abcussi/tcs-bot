@@ -92,6 +92,38 @@ def list_vendors(limit: int = 50) -> list[dict[str, Any]]:
     ]
 
 
+@mcp.tool()
+def search_tcs_risks(query: str, k: int = 10, category: str | None = None) -> list[GoldHit]:
+    """Semantic search over the TCS risk gold layer (news + community posts about Tata
+    Consultancy Services). Returns the best-matching document chunks with risk categories,
+    risk score (0-100) and cluster. Optional ``category``: ethics, compliance_regulatory,
+    legal_litigation, data_privacy_cyber, labor_hr, financial, operational_delivery,
+    reputational, esg, geopolitical_immigration."""
+    from tcs_bot.medallion.gold.search import search_risks
+    from tcs_bot.medallion.models import RISK_CATEGORIES
+
+    if category is not None and category not in RISK_CATEGORIES:
+        raise ToolError(f"validation_error: unknown risk category {category!r}")
+    try:
+        return search_risks(
+            query, k=max(1, min(int(k), 100)), categories=[category] if category else None
+        )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+def tcs_risk_summary() -> dict[str, Any]:
+    """Summary of the TCS risk gold layer: build metadata, KMeans clusters (label, top terms,
+    dominant risk categories, mean risk), Louvain communities and dashboard statistics."""
+    from tcs_bot.medallion.gold.search import load_summary
+
+    try:
+        return load_summary()
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="tcs-bot-mcp", description=__doc__)
     parser.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")

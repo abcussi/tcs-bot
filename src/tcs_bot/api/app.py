@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from tcs_bot.api.errors import register_error_handlers
 from tcs_bot.api.routes import router
+from tcs_bot.api.tcs_routes import router as tcs_router
 from tcs_bot.logging_setup import get_logger
 from tcs_bot.services.report_service import ReportService
 
@@ -93,4 +94,5 @@ def create_app(
     app.state.health_checks_factory = health_checks_factory
     register_error_handlers(app)
     app.include_router(router)
+    app.include_router(tcs_router)
     return app
