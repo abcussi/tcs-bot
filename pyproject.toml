@@ -7,12 +7,14 @@ requires-python = ">=3.13"
 dependencies = [
     "elasticsearch>=8.15,<9",
     "fastapi>=0.162.0",
+    "feedparser>=6.0.14",
     "gfinance-crawler",
     "httpx>=0.28.1",
     "langchain-core>=1.7.6",
     "langchain-openai>=1.7.4",
     "mcp>=2.3.0",
     "mysql-connector-python>=9",
+    "networkx>=3.7",
     "numpy>=2.5.4",
     "openai>=3.46.0",
     "pdf2image>=1.17.0",
@@ -23,9 +25,12 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.33",
+    "qdrant-client>=1.12",
     "redis>=5",
+    "scikit-learn>=1.9.1",
     "structlog>=26.1.0",
     "tenacity>=9.2.1",
+    "trafilatura>=2.3.1",
     "uvicorn[standard]>=0.54.0",
 ]
 
