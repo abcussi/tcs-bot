@@ -3,9 +3,9 @@
 ## Tables (db/schema.sql) — InnoDB, utf8mb4
 - `schema_migrations(version VARCHAR(64) PK, applied_at DATETIME)`
 - `vendors(id BIGINT PK AI, external_id VARCHAR(64) UNIQUE, name, sector, country, ticker NULL, criticality ENUM('low','medium','high','critical'), services TEXT, created_at, updated_at)`
-- `vendor_documents(id PK AI, vendor_id FK, doc_type ENUM('financial_report','news','regulatory_filing','other'), title, source, published_at DATE NULL, content MEDIUMTEXT, content_sha256 CHAR(64), created_at, UNIQUE(vendor_id, content_sha256))`
+- `vendor_documents(id PK AI, vendor_id FK ON DELETE CASCADE, doc_type ENUM('financial_report','news','regulatory_filing','other'), title, source, published_at DATE NULL, content MEDIUMTEXT, content_sha256 CHAR(64), created_at, UNIQUE(vendor_id, content_sha256))`
 - `document_chunks(id PK AI, document_id FK ON DELETE CASCADE, chunk_index INT, text TEXT, embedding JSON NULL, embedding_model VARCHAR(64) NULL, UNIQUE(document_id, chunk_index))`
-- `risk_reports(id PK AI, vendor_id FK, overall_score DECIMAL(5,2), risk_level VARCHAR(16), report_json JSON, model VARCHAR(64), created_at)`
+- `risk_reports(id PK AI, vendor_id FK ON DELETE CASCADE, overall_score DECIMAL(5,2), risk_level VARCHAR(16), report_json JSON, model VARCHAR(64), created_at)`
 - `audit_log(id PK AI, action VARCHAR(64), entity VARCHAR(64), entity_id VARCHAR(64), payload JSON, created_at)`
 
 ## Public API
@@ -56,6 +56,6 @@ def index_chunks(vendor_id: int, chunks: list[ChunkRecord]) -> int
 def latest_quote(ticker: str) -> dict | None       # newest doc from market-quotes by ticker
 def ping() -> bool
 ```
-Domain models (`Vendor`, `VendorCreate`, `DocumentCreate`, `VendorDocument`, `ChunkRecord`,
-`StoredReport`) live in `schemas/domain.py`.
+Domain models (`Vendor`, `VendorCreate`, `DocumentCreate`, `VendorDocument`, `ChunkRecord`;
+`StoredReport` is in `schemas/report.py`) live in `schemas/domain.py`.
 `ChunkRecord(document_id:int|None, chunk_index:int, text:str, embedding:list[float]|None, embedding_model:str|None, doc_type:str|None, title:str|None)`.
