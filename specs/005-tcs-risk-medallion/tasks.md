@@ -37,8 +37,8 @@
   `per_query_limit`, `inbox_dir` and defaults caps to settings (None). `CrawlStats.stored` = NEW
   bronze rows; rows already in bronze count as `duplicates`. Depth-0 items are also
   relevance-filtered (except LocalInbox). GDELT depth-0 url is `...doc/doc?format=json&mode=artlist&item=<article url>`
-  (GDELT has no item permalink). reddit.com robots.txt disallows crawlers, so in production
-  RedditSearch is normally reported as blocked.
+  (GDELT has no item permalink). if reddit.com robots.txt disallows generic crawlers (it did as of
+  2024), RedditSearch is reported as blocked in production; robots is respected, not bypassed.
 
 ## SILVER (`src/tcs_bot/medallion/silver/`, owner: agent SILVER)
 - [x] `extract.py` — `extract_main_text(raw, content_type, url) -> (text, title|None)`: HTML via

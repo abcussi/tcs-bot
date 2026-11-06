@@ -52,7 +52,9 @@ def test_run_gold_end_to_end(tmp_path: Path, vs: GoldVectorStore, settings: Sett
     assert node["neighbors"] and node["signals"][0]["evidence"]
     assert graph["meta"]["synthetic"] is True and "SYNTHETIC" in graph["meta"]["data_source"]
     # clusters in the Qdrant payload match graph.json
-    topic_cluster = {(topic_of(r), n["cluster"]) for r, n in zip(records, graph["nodes"])}
+    topic_cluster = {
+        (topic_of(r), n["cluster"]) for r, n in zip(records, graph["nodes"], strict=True)
+    }
     assert len(topic_cluster) == 3
 
     summary = json.loads((tmp_path / "summary.json").read_text())

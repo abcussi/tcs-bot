@@ -313,8 +313,8 @@ class HackerNews(_HttpSource):
 # ------------------------------------------------------------------ Reddit
 class RedditSearch(_HttpSource):
     """Reddit search JSON: site-wide plus per-subreddit (``restrict_sr=1``); depth 1 = the
-    thread's ``<permalink>.json``. Note reddit.com/robots.txt may disallow crawling, in which
-    case every endpoint is reported as blocked."""
+    thread's ``<permalink>.json``. If reddit.com/robots.txt disallows our agent, every endpoint
+    is reported as blocked (robots is respected, never bypassed)."""
 
     name = "reddit"
     source_type: SourceType = "community"

@@ -118,7 +118,7 @@ header.top h1 { font-size: 20px; line-height: 1.2; margin: 0 0 4px; font-weight:
 .ctl output { font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3.2em; }
 .search { border: 1px solid var(--border); background: var(--raised); border-radius: 7px;
   padding: 4px 10px; width: 220px; }
-.stage { position: relative; height: clamp(440px, calc(100vh - 230px), 820px); }
+.stage { position: relative; height: clamp(420px, calc(100vh - 330px), 820px); }
 .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .stage canvas.dragging { cursor: grabbing; }
 .stage .empty { position: absolute; inset: 0; display: grid; place-items: center;
@@ -146,7 +146,7 @@ header.top h1 { font-size: 20px; line-height: 1.2; margin: 0 0 4px; font-weight:
 .tip .m { color: var(--ink2); }
 .tip .r { font-size: 16px; font-weight: 700; }
 aside.side { display: flex; flex-direction: column; min-height: 0; }
-aside.side .body { overflow: auto; max-height: calc(clamp(440px, calc(100vh - 230px), 820px) + 10px); }
+aside.side .body { overflow: auto; max-height: calc(clamp(420px, calc(100vh - 330px), 820px) + 40px); }
 .dtitle { font-size: 15px; font-weight: 650; line-height: 1.3; margin: 2px 0 4px; }
 .dmeta { color: var(--ink2); font-size: 12.5px; margin-bottom: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
@@ -165,7 +165,7 @@ aside.side .body { overflow: auto; max-height: calc(clamp(440px, calc(100vh - 23
 .sev.high { background: var(--serious); color: #0b0b0b; }
 .sev.critical { background: var(--critical); }
 .sig q { color: var(--ink2); display: block; margin-top: 2px; }
-.nb { display: grid; grid-template-columns: 1fr 70px 42px; gap: 8px; align-items: center;
+.nb { display: grid; grid-template-columns: 1fr 64px 50px; gap: 8px; align-items: center;
   padding: 3px 4px; border-radius: 4px; cursor: pointer; font-size: 12.5px; }
 .nb:hover { background: var(--wash); }
 .nb .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -187,6 +187,7 @@ td { padding: 5px 6px; border-bottom: 1px solid var(--grid); vertical-align: top
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 tbody tr { cursor: pointer; }
 tbody tr:hover { background: var(--wash); }
+.list { max-height: 520px; overflow: auto; }
 .list .it { display: grid; grid-template-columns: 44px 1fr; gap: 8px; padding: 6px 4px;
   border-bottom: 1px solid var(--grid); cursor: pointer; font-size: 12.5px; }
 .list .it:hover { background: var(--wash); }
@@ -570,15 +571,19 @@ function paint() {
   }
   // labels
   var labelled = [];
-  if (focus) { labelled.push(focus); adj.get(focus).forEach(function (o) { if (labelled.length < 12) labelled.push(o); }); }
+  if (focus) {
+    labelled.push(focus);
+    (focus.neighbors || []).forEach(function (pr) { var o = byId.get(pr[0]); if (o && adj.get(focus).has(o) && labelled.length < 6) labelled.push(o); });
+  }
   if (state.matches && state.matches.size <= 25) state.matches.forEach(function (n) { if (labelled.indexOf(n) < 0) labelled.push(n); });
   ctx.font = '12px system-ui, -apple-system, "Segoe UI", sans-serif';
   ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   labelled.forEach(function (n, idx) {
     var p = toScreen(n), txt = n.title || ('#' + n.id);
     if (txt.length > 60) txt = txt.slice(0, 58) + '…';
-    var x = p[0] + n.r * zr + 5;
     ctx.font = (idx === 0 && focus ? '600 ' : '') + '12px system-ui, -apple-system, "Segoe UI", sans-serif';
+    var tw = ctx.measureText(txt).width, x = p[0] + n.r * zr + 5;
+    if (x + tw > W - 8) x = p[0] - n.r * zr - 5 - tw;
     ctx.lineWidth = 4; ctx.strokeStyle = tokens['--surface']; ctx.strokeText(txt, x, p[1]);
     ctx.fillStyle = tokens['--ink']; ctx.fillText(txt, x, p[1]);
   });
@@ -655,7 +660,11 @@ function centerOn(n) {
 }
 function select(n, center) {
   state.selected = n || null;
-  if (n && center) centerOn(n);
+  if (n && center) {
+    centerOn(n);
+    var r = stage.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   renderSide(); draw();
 }
 
@@ -670,14 +679,15 @@ function renderOverview(box) {
    ['Louvain communities', META.n_communities], ['Graph', 'k=' + META.graph_k + ', cosine ≥ ' + fmt(META.graph_min_cosine)],
    ['Qdrant', META.qdrant || '–']].forEach(function (r) { dl.appendChild(el('dt', { text: r[0] })); dl.appendChild(el('dd', { text: String(r[1] === undefined ? '–' : r[1]) })); });
   box.appendChild(dl);
-  var central = nodes.slice().sort(function (a, b) { return (b.betweenness || 0) - (a.betweenness || 0); }).slice(0, 8);
-  if (central.length) {
-    box.appendChild(el('div', { cls: 'sec', text: 'Bridging documents (betweenness)' }));
+  var deg = function (n) { return adj.get(n).size; };
+  var central = nodes.slice().sort(function (a, b) { return deg(b) - deg(a) || (b.betweenness || 0) - (a.betweenness || 0) || b.risk_score - a.risk_score; }).slice(0, 10);
+  if (central.length && deg(central[0]) > 0) {
+    box.appendChild(el('div', { cls: 'sec', text: 'Hub documents (most similar neighbours)' }));
     central.forEach(function (n) {
-      box.appendChild(el('div', { cls: 'nb', onclick: function () { select(n, true); } },
-        el('span', { cls: 'tt', title: n.title, text: n.title }),
-        el('span', { cls: 'bar' }, el('i', { style: 'width:' + Math.round(100 * (n.betweenness || 0) / Math.max(1e-9, central[0].betweenness || 1)) + '%' })),
-        el('span', { cls: 'v', text: fmt(n.betweenness, 3) })));
+      box.appendChild(el('div', { cls: 'nb', title: n.title, onclick: function () { select(n, true); } },
+        el('span', { cls: 'tt' }, el('span', { cls: 'sw', style: 'display:inline-block;margin-right:6px;vertical-align:-1px;background:' + colorOf(n) }), n.title),
+        el('span', { cls: 'bar' }, el('i', { style: 'width:' + Math.round(100 * deg(n) / deg(central[0])) + '%' })),
+        el('span', { cls: 'v', text: deg(n) + ' links' })));
     });
   }
 }
@@ -867,7 +877,7 @@ function onSlider() {
   state.minCos = parseFloat(slider.value); $('min-cos-v').textContent = fmt(state.minCos);
   rebuildLinks(); updateHistThr();
   if (state.layout === 'force') runSim(0.35); else draw();
-  if (state.selected) renderSide();
+  renderSide();
 }
 slider.addEventListener('input', onSlider);
 $('q').addEventListener('input', function (e) {
