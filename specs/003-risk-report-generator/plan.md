@@ -21,3 +21,14 @@ services/report_service.py
     def build_default_service() -> ReportService
 mcp_server/server.py  mcp = FastMCP("vendor-risk"); tools; def main()
 ```
+
+## Implementation notes (recorded deviations)
+- `mcp` >= 2.x renamed `FastMCP` to `mcp.server.mcpserver.MCPServer`; `server.py` imports either.
+- `.with_structured_output(RiskReport, method="function_calling")`: OpenAI strict json_schema mode
+  rejects fields with defaults. Model/temperature unchanged (gpt-4.1-mini, 0.0).
+- `create_app(service=None, health_checks=None)` — health checks injectable for tests.
+- Chain input accepts optional `data_gaps: list[str]`, merged into the report.
+- `embed_all_pending()` returns number of documents embedded.
+- Stored embeddings with a different `embedding_model` are ignored and re-embedded (hash vs OpenAI
+  vectors share dim 1536 but are not comparable).
+- Lookup by `vendor_name`: exact name/external_id, then unique partial match; ambiguous -> 422 `ambiguous_vendor`.
