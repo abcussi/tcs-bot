@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
 
 from tcs_bot.api.deps import get_service
@@ -46,6 +48,21 @@ def _multipart_installed() -> bool:
     except ImportError:
         return False
     return True
+
+
+# ----------------------------------------------------------------------------- dashboard
+_DASHBOARD = Path(__file__).parent / "static" / "dashboard.html"
+
+
+@router.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse("/dashboard")
+
+
+@router.get("/dashboard", include_in_schema=False, response_class=HTMLResponse)
+def dashboard() -> HTMLResponse:
+    """Single-page vendor risk dashboard (AC-003.10); calls the JSON endpoints below."""
+    return HTMLResponse(_DASHBOARD.read_text(encoding="utf-8"))
 
 
 # ----------------------------------------------------------------------------- health

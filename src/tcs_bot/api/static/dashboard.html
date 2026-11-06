@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vendor Risk Dashboard</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #14181f; --muted: #5b6573; --line: #dfe3ea;
+  --accent: #2456d6; --accent-ink: #ffffff;
+  --low: #1f8a4c; --medium: #a8730a; --high: #c4540c; --critical: #b3261e;
+  --low-bg: #e4f4ea; --medium-bg: #fbf0d6; --high-bg: #fbe5d6; --critical-bg: #fbe0de;
+  --track: #e6e9ef; --shadow: 0 1px 2px rgba(20,24,31,.06), 0 4px 14px rgba(20,24,31,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --panel: #171c25; --ink: #e8ebf0; --muted: #9aa5b5; --line: #2a3140;
+    --accent: #6d94ff; --accent-ink: #0b1020;
+    --low: #4cc983; --medium: #e5b24a; --high: #f2894a; --critical: #ff7b72;
+    --low-bg: #12301f; --medium-bg: #33290f; --high-bg: #35200f; --critical-bg: #3a1614;
+    --track: #262d3b; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218; --panel: #171c25; --ink: #e8ebf0; --muted: #9aa5b5; --line: #2a3140;
+  --accent: #6d94ff; --accent-ink: #0b1020;
+  --low: #4cc983; --medium: #e5b24a; --high: #f2894a; --critical: #ff7b72;
+  --low-bg: #12301f; --medium-bg: #33290f; --high-bg: #35200f; --critical-bg: #3a1614;
+  --track: #262d3b; --shadow: none;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+button { font: inherit; }
+header.top {
+  display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+header.top h1 { margin: 0; font-size: 18px; letter-spacing: .01em; }
+header.top h1 small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); background: var(--bg);
+}
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill.ok i { background: var(--low); } .pill.down i { background: var(--critical); }
+.pill.ok { color: var(--ink); }
+a.link { color: var(--accent); text-decoration: none; font-size: 13px; }
+a.link:hover { text-decoration: underline; }
+main { display: grid; grid-template-columns: minmax(250px, 340px) 1fr; gap: 16px; padding: 16px 20px 40px; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+aside .card { padding: 14px; }
+aside h2, section h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.portfolio { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.tile { border-radius: 8px; padding: 8px 4px; text-align: center; font-size: 12px; }
+.tile b { display: block; font-size: 20px; line-height: 1.1; }
+.t-low { background: var(--low-bg); color: var(--low); } .t-medium { background: var(--medium-bg); color: var(--medium); }
+.t-high { background: var(--high-bg); color: var(--high); } .t-critical { background: var(--critical-bg); color: var(--critical); }
+.btn {
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px;
+  padding: 7px 12px; cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.full { width: 100%; margin-bottom: 12px; }
+.vendors { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vendor {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; width: 100%; text-align: left;
+  padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink); cursor: pointer;
+}
+.vendor:hover { border-color: var(--accent); }
+.vendor[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.vendor .name { font-weight: 600; font-size: 14px; }
+.vendor .meta { grid-column: 1; font-size: 12px; color: var(--muted); }
+.score { grid-row: 1 / span 2; grid-column: 2; min-width: 46px; text-align: center; padding: 4px 8px; border-radius: 8px; font-weight: 700; font-size: 15px; }
+.score.none { background: var(--bg); color: var(--muted); font-weight: 500; font-size: 11.5px; }
+.score.low { background: var(--low-bg); color: var(--low); } .score.medium { background: var(--medium-bg); color: var(--medium); }
+.score.high { background: var(--high-bg); color: var(--high); } .score.critical { background: var(--critical-bg); color: var(--critical); }
+section.detail { display: grid; gap: 16px; align-content: start; }
+.panel { padding: 18px; }
+.vhead { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; align-items: flex-start; }
+.vhead h2 { margin: 0; font-size: 22px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.vhead .sub { color: var(--muted); font-size: 13.5px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls input[type=text] {
+  font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); width: 210px;
+}
+.overall { display: grid; grid-template-columns: 190px 1fr; gap: 18px; align-items: center; margin-top: 8px; }
+@media (max-width: 620px) { .overall { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+.gauge { position: relative; width: 190px; }
+.gauge svg { display: block; width: 100%; }
+.gauge .val { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 34px; font-weight: 700; line-height: 1; }
+.gauge .val small { display: block; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.lvl { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.lvl.low { background: var(--low-bg); color: var(--low); } .lvl.medium { background: var(--medium-bg); color: var(--medium); }
+.lvl.high { background: var(--high-bg); color: var(--high); } .lvl.critical { background: var(--critical-bg); color: var(--critical); }
+.narr { margin: 8px 0 0; color: var(--ink); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr; } }
+.flag { border: 1px solid var(--line); border-left-width: 4px; border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; }
+.flag.low { border-left-color: var(--low); } .flag.medium { border-left-color: var(--medium); }
+.flag.high { border-left-color: var(--high); } .flag.critical { border-left-color: var(--critical); }
+.flag .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; align-items: center; }
+.tag { font-size: 11.5px; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); text-transform: capitalize; }
+.flag p { margin: 2px 0; } .flag .ev { color: var(--muted); font-size: 13px; font-style: italic; }
+.metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+.metric { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+.metric span { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.metric div { font-size: 13.5px; }
+.rec { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.rec:last-child { border-bottom: 0; }
+.pri { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 6px; align-self: start; }
+.pri.high { background: var(--critical-bg); color: var(--critical); } .pri.medium { background: var(--medium-bg); color: var(--medium); }
+.pri.low { background: var(--low-bg); color: var(--low); }
+.rec .reg { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+details ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
+.empty, .notice { color: var(--muted); padding: 22px; text-align: center; }
+.notice.err { color: var(--critical); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+.foot { color: var(--muted); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Vendor Risk Dashboard<small>AI-generated third-party risk reports for capital markets</small></h1>
+  <div class="pills" id="health" aria-live="polite"></div>
+  <div class="pills">
+    <a class="link" href="/docs">API docs</a>
+    <a class="link" href="/tcs/risks/overview">TCS risk overview</a>
+  </div>
+</header>
+<main>
+  <aside>
+    <div class="card">
+      <h2>Portfolio</h2>
+      <div class="portfolio" id="portfolio"></div>
+      <button class="btn full" id="genAll">Generate all reports</button>
+      <h2>Vendors</h2>
+      <ul class="vendors" id="vendors"></ul>
+    </div>
+  </aside>
+  <section class="detail" id="detail">
+    <div class="card empty">Loading vendors&hellip;</div>
+  </section>
+</main>
+<script>
+"use strict";
+const LEVELS = ["low", "medium", "high", "critical"];
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+const PRI_ORDER = { high: 0, medium: 1, low: 2 };
+const state = { vendors: [], reports: new Map(), selected: null, busy: new Set() };
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined && text !== null) n.textContent = text;
+  return n;
+}
+function level(v) { return LEVELS.includes(v) ? v : "medium"; }
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  let body = null;
+  try { body = await res.json(); } catch (_) { /* non-JSON */ }
+  if (!res.ok) {
+    const msg = body && body.error ? body.error.message : (body && body.detail) || res.statusText;
+    const e = new Error(msg); e.status = res.status; throw e;
+  }
+  return body;
+}
+
+async function loadHealth() {
+  const box = document.getElementById("health");
+  box.replaceChildren();
+  try {
+    const h = await api("/health");
+    for (const k of ["mysql", "redis", "elasticsearch"]) {
+      const p = el("span", "pill " + h[k]); p.append(el("i"), document.createTextNode(k)); box.append(p);
+    }
+    const m = el("span", "pill " + (h.llm_provider === "openai" ? "ok" : "down"));
+    m.append(el("i"), document.createTextNode("LLM: " + h.llm_provider));
+    box.append(m);
+  } catch (e) {
+    const p = el("span", "pill down"); p.append(el("i"), document.createTextNode("API unreachable")); box.append(p);
+  }
+}
+
+function renderPortfolio() {
+  const box = document.getElementById("portfolio");
+  box.replaceChildren();
+  const counts = { low: 0, medium: 0, high: 0, critical: 0 };
+  for (const r of state.reports.values()) if (r) counts[level(r.risk_level)]++;
+  for (const l of LEVELS) {
+    const t = el("div", "tile t-" + l); t.append(el("b", null, String(counts[l])), document.createTextNode(l)); box.append(t);
+  }
+}
+
+function renderVendors() {
+  const ul = document.getElementById("vendors");
+  ul.replaceChildren();
+  for (const v of state.vendors) {
+    const r = state.reports.get(v.id);
+    const li = document.createElement("li");
+    const b = el("button", "vendor"); b.type = "button";
+    if (state.selected === v.id) b.setAttribute("aria-current", "true");
+    b.append(el("span", "name", v.name), el("span", "meta", v.sector + " · " + v.country + " · " + v.criticality));
+    const s = r ? el("span", "score " + level(r.risk_level), String(Math.round(r.overall_risk_score)))
+                : el("span", "score none", state.busy.has(v.id) ? "…" : "no report");
+    b.append(s);
+    b.addEventListener("click", () => select(v.id));
+    li.append(b); ul.append(li);
+  }
+}
+
+function gauge(score, lvl) {
+  const len = Math.PI * 50;
+  const wrap = el("div", "gauge");
+  wrap.innerHTML =
+    '<svg viewBox="0 0 120 66" role="img" aria-label="Risk score gauge">' +
+    '<path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="var(--track)" stroke-width="10" stroke-linecap="round"/>' +
+    '<path class="fill" d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke-width="10" stroke-linecap="round"/></svg>';
+  const fill = wrap.querySelector(".fill");
+  fill.setAttribute("stroke", "var(--" + lvl + ")");
+  fill.setAttribute("stroke-dasharray", (len * Math.max(0, Math.min(100, score)) / 100).toFixed(2) + " " + len.toFixed(2));
+  const val = el("div", "val", String(Math.round(score))); val.append(el("small", null, "of 100"));
+  wrap.append(val);
+  return wrap;
+}
+
+function panel(title) { const p = el("div", "card panel"); if (title) p.append(el("h2", null, title)); return p; }
+
+function renderReport(v, r) {
+  const frag = document.createDocumentFragment();
+  const lvl = level(r.risk_level);
+
+  const p1 = panel("Overall risk score");
+  const ov = el("div", "overall");
+  ov.append(gauge(r.overall_risk_score, lvl));
+  const right = el("div");
+  right.append(el("span", "lvl " + lvl, lvl + " risk"));
+  right.append(el("p", "narr", r.risk_narrative));
+  ov.append(right); p1.append(ov);
+  p1.append(el("div", "foot", "Model " + r.model + " · generated " + new Date(r.generated_at).toLocaleString()));
+  frag.append(p1);
+
+  const grid = el("div", "grid2");
+
+  const p2 = panel("Identified red flags (" + r.red_flags.length + ")");
+  if (!r.red_flags.length) p2.append(el("div", "empty", "No red flags identified."));
+  for (const f of [...r.red_flags].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity])) {
+    const d = el("div", "flag " + level(f.severity));
+    const row = el("div", "row");
+    row.append(el("span", "lvl " + level(f.severity), f.severity), el("span", "tag", f.category));
+    d.append(row, el("p", null, f.description));
+    if (f.evidence) d.append(el("p", "ev", "“" + f.evidence + "”"));
+    p2.append(d);
+  }
+  grid.append(p2);
+
+  const fh = r.financial_health;
+  const p3 = panel("Financial health summary");
+  p3.append(el("p", "narr", fh.summary));
+  const mt = el("div", "metrics");
+  for (const [k, label] of [["liquidity", "Liquidity"], ["profitability", "Profitability"], ["leverage", "Leverage"], ["market_signal", "Market signal"]]) {
+    const m = el("div", "metric"); m.append(el("span", null, label), el("div", null, fh[k])); mt.append(m);
+  }
+  p3.append(mt);
+  grid.append(p3);
+  frag.append(grid);
+
+  const p4 = panel("Compliance recommendations (" + r.compliance_recommendations.length + ")");
+  if (!r.compliance_recommendations.length) p4.append(el("div", "empty", "No recommendations."));
+  for (const c of [...r.compliance_recommendations].sort((a, b) => PRI_ORDER[a.priority] - PRI_ORDER[b.priority])) {
+    const d = el("div", "rec");
+    d.append(el("span", "pri " + c.priority, c.priority), el("div", null, c.recommendation));
+    if (c.regulation_reference) d.append(el("div", "reg", "Regulation: " + c.regulation_reference));
+    p4.append(d);
+  }
+  frag.append(p4);
+
+  const p5 = panel();
+  const det = el("details");
+  det.append(el("summary", null, "Evidence sources (" + r.sources.length + ") and data gaps (" + r.data_gaps.length + ")"));
+  const ul = el("ul");
+  for (const s of r.sources) ul.append(el("li", null, (s.title || "document " + s.document_id) + " – chunk " + s.chunk_index + ", similarity " + s.score.toFixed(2)));
+  det.append(ul);
+  if (r.data_gaps.length) {
+    det.append(el("div", "foot", "Data gaps"));
+    const g = el("ul"); for (const x of r.data_gaps) g.append(el("li", null, x)); det.append(g);
+  }
+  p5.append(det); frag.append(p5);
+  return frag;
+}
+
+function renderDetail() {
+  const box = document.getElementById("detail");
+  box.replaceChildren();
+  const v = state.vendors.find((x) => x.id === state.selected);
+  if (!v) { box.append(el("div", "card empty", "No vendors found. Run `tcs-bot seed`.")); return; }
+  const r = state.reports.get(v.id);
+  const busy = state.busy.has(v.id);
+
+  const head = panel();
+  const vh = el("div", "vhead");
+  const left = el("div");
+  left.append(el("h2", null, v.name),
+    el("div", "sub", [v.sector, v.country, v.ticker ? "Ticker " + v.ticker : null, "Criticality: " + v.criticality].filter(Boolean).join(" · ")));
+  if (v.services) left.append(el("div", "sub", v.services));
+  const ctl = el("div", "controls");
+  const focus = el("input"); focus.type = "text"; focus.id = "focus"; focus.placeholder = "Focus areas, e.g. cyber, liquidity";
+  focus.setAttribute("aria-label", "Focus areas, comma separated");
+  focus.value = state.focus || ""; focus.addEventListener("input", () => { state.focus = focus.value; });
+  const go = el("button", "btn primary", r ? "Refresh report" : "Generate report"); go.type = "button"; go.disabled = busy;
+  go.addEventListener("click", () => generate(v.id, !!r));
+  ctl.append(focus, go);
+  vh.append(left, ctl); head.append(vh);
+  box.append(head);
+
+  if (busy) {
+    const n = el("div", "card notice"); n.append(el("span", "spin"), document.createTextNode("Generating with the language model (about 15 seconds)…"));
+    box.append(n);
+  } else if (state.errors && state.errors[v.id]) {
+    box.append(el("div", "card notice err", state.errors[v.id]));
+  } else if (!r) {
+    box.append(el("div", "card empty", "No report yet. Click Generate report."));
+  }
+  if (r) box.append(renderReport(v, r));
+}
+
+async function generate(id, fresh) {
+  const focus = (state.focus || "").split(",").map((s) => s.trim()).filter(Boolean);
+  state.busy.add(id); (state.errors ||= {})[id] = null;
+  renderVendors(); if (state.selected === id) renderDetail();
+  try {
+    const rep = await api("/reports", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vendor_id: id, focus_areas: focus, use_cache: !(fresh || focus.length) }),
+    });
+    state.reports.set(id, rep);
+  } catch (e) {
+    state.errors[id] = "Could not generate the report: " + e.message;
+  } finally {
+    state.busy.delete(id); renderPortfolio(); renderVendors(); if (state.selected === id) renderDetail();
+  }
+}
+
+function select(id) { state.selected = id; renderVendors(); renderDetail(); }
+
+async function init() {
+  loadHealth();
+  try {
+    state.vendors = await api("/vendors?limit=500");
+  } catch (e) {
+    document.getElementById("detail").replaceChildren(el("div", "card notice err", "Could not load vendors: " + e.message));
+    return;
+  }
+  await Promise.all(state.vendors.map(async (v) => {
+    try { state.reports.set(v.id, await api("/reports/" + v.id + "/latest")); } catch (_) { state.reports.set(v.id, null); }
+  }));
+  state.selected = state.vendors.length ? state.vendors[0].id : null;
+  renderPortfolio(); renderVendors(); renderDetail();
+}
+
+document.getElementById("genAll").addEventListener("click", async (ev) => {
+  ev.target.disabled = true;
+  for (const v of state.vendors) { if (!state.reports.get(v.id)) await generate(v.id, false); }
+  ev.target.disabled = false;
+});
+init();
+</script>
+</body>
+</html>

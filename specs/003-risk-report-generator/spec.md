@@ -20,3 +20,7 @@
   + generating model id, so a different `top_k` or a provider switch never serves a stale report) and
   persisted to `risk_reports`.
 - AC-003.9 MCP server (FastMCP, stdio + streamable-http) exposes tool `generate_vendor_risk_report(vendor_id|vendor_name, focus_areas)` and `list_vendors`.
+- AC-003.10 `GET /dashboard` (and `GET /` redirecting to it) serves a self-contained page that lists vendors,
+  generates a report on demand through `POST /reports`, and shows the four report sections: overall risk
+  score, red flags, financial health summary, compliance recommendations. All report text is rendered as
+  text (never HTML).

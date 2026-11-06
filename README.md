@@ -33,7 +33,9 @@ cp .env.example .env              # set OPENAI_API_KEY (or LLM_PROVIDER=fake to 
 uv sync
 uv run tcs-bot all         # docker compose up mysql/redis/es -> migrate -> seed -> index -> crawl -> API
 ```
-Open http://localhost:8000/docs. Generate a report:
+Open http://localhost:8000/ for the **vendor risk dashboard** (overall risk score, red flags, financial
+health summary, compliance recommendations; generates reports on demand) or
+http://localhost:8000/docs for the API. Generate a report from the command line:
 ```bash
 curl -s -XPOST localhost:8000/reports -H 'content-type: application/json' -d '{"vendor_id": 1}'
 ```
@@ -42,6 +44,13 @@ Everything in containers (API + crawler + infra):
 ```bash
 docker compose --profile app up -d --build
 ```
+
+Optional Kibana (same version as Elasticsearch) to browse the indices, run outside Compose:
+```bash
+docker run -d --name tcs-bot-kibana --network tcs-bot_default -p 5601:5601 \
+  -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 docker.elastic.co/kibana/kibana:8.15.3
+```
+Open http://localhost:5601 (Discover, then a data view on `silver-tcs-risk`, `gold-tcs-risk-*`, `vendor-chunks`).
 
 ### Steps
 | Command | What it does |

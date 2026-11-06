@@ -167,3 +167,19 @@ def test_route_raising_not_found_from_service(client: TestClient, service: Repor
     assert r.json() == {
         "error": {"code": "not_found", "message": "gone", "details": {"vendor_id": 1}}
     }
+
+
+def test_dashboard_served_and_root_redirects(client: TestClient) -> None:
+    """AC-003.10: the dashboard page is served and shows the four report sections."""
+    r = client.get("/dashboard")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    for section in (
+        "Overall risk score",
+        "Identified red flags",
+        "Financial health summary",
+        "Compliance recommendations",
+    ):
+        assert section in r.text
+    assert r.text.count("innerHTML") == 1, "only the static gauge markup may use innerHTML"
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code in (302, 307) and root.headers["location"] == "/dashboard"
