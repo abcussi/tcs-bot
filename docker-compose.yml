@@ -59,10 +59,30 @@ services:
       ELASTIC_URL: http://elasticsearch:9200
       QDRANT_URL: http://qdrant:6333
     ports: ["8000:8000"]
+    volumes: [gold_data:/app/data/gold]
     depends_on:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
       elasticsearch: { condition: service_healthy }
+
+  medallion:
+    # TCS risk pipeline on a schedule: crawl -> bronze (MySQL) -> silver (ES) -> gold (Qdrant + graph)
+    build: { context: ., dockerfile: Dockerfile }
+    profiles: ["app"]
+    env_file: .env
+    restart: on-failure
+    command: ["tcs-bot", "medallion", "schedule", "--cron", "0 */6 * * *"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      REDIS_URL: redis://redis:6379/0
+      ELASTIC_URL: http://elasticsearch:9200
+      QDRANT_URL: http://qdrant:6333
+    volumes: [gold_data:/app/data/gold]
+    depends_on:
+      mysql: { condition: service_healthy }
+      elasticsearch: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
 
   crawler:
     build: { context: ., dockerfile: crawler/Dockerfile }
@@ -75,6 +95,7 @@ services:
       elasticsearch: { condition: service_healthy }
 
 volumes:
+  gold_data:
   qdrant_data:
   mysql_data:
   es_data:
