@@ -53,6 +53,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "crawler/tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
   "integration: needs live MySQL / Redis / Elasticsearch (docker compose up)",
   "e2e: full HTTP flow through the running stack",
