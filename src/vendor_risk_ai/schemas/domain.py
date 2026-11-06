@@ -1,4 +1,7 @@
-"""Domain models shared by db/, search/, rag/ and services/ (contract: specs/001-data-layer/plan.md)."""
+"""Domain models shared by db/, search/, rag/ and services/.
+
+Contract: specs/001-data-layer/plan.md
+"""
 
 from __future__ import annotations
 

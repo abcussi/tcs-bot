@@ -22,11 +22,18 @@ def score_to_level(score: float) -> RiskLevel:
     return "low"
 
 
+RedFlagCategory = Literal[
+    "financial", "operational", "compliance", "reputational", "cyber", "concentration", "other"
+]
+
+
 class RedFlag(BaseModel):
-    category: Literal["financial", "operational", "compliance", "reputational", "cyber", "concentration", "other"]
+    category: RedFlagCategory
     severity: Severity
     description: str = Field(description="One-sentence description of the red flag")
-    evidence: str = Field(default="", description="Short quote or paraphrase from the source chunks")
+    evidence: str = Field(
+        default="", description="Short quote or paraphrase from the source chunks"
+    )
 
 
 class FinancialHealth(BaseModel):
@@ -34,13 +41,17 @@ class FinancialHealth(BaseModel):
     liquidity: str = Field(default="unknown", description="Assessment of liquidity / cash position")
     profitability: str = Field(default="unknown")
     leverage: str = Field(default="unknown")
-    market_signal: str = Field(default="unknown", description="What market data (price, change, P/E) suggests")
+    market_signal: str = Field(
+        default="unknown", description="What market data (price, change, P/E) suggests"
+    )
 
 
 class ComplianceRecommendation(BaseModel):
     priority: Priority
     recommendation: str
-    regulation_reference: str = Field(default="", description="e.g. DORA, SEC Reg SCI, FINRA 3110, SOX")
+    regulation_reference: str = Field(
+        default="", description="e.g. DORA, SEC Reg SCI, FINRA 3110, SOX"
+    )
 
 
 class SourceRef(BaseModel):

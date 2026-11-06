@@ -1,7 +1,7 @@
 """Orchestrator: one entrypoint that boots and runs the whole system (spec 004).
 
-    uv run vendor-risk-ai all        # infra up -> migrate -> seed -> index -> crawl -> API
-    uv run vendor-risk-ai <step>   # up|down|status|migrate|seed|index|crawl|api|mcp
+uv run vendor-risk-ai all        # infra up -> migrate -> seed -> index -> crawl -> API
+uv run vendor-risk-ai <step>   # up|down|status|migrate|seed|index|crawl|api|mcp
 """
 
 from __future__ import annotations
@@ -127,11 +127,17 @@ PIPELINE = ["up", "migrate", "seed", "index", "crawl", "api"]
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="vendor-risk-ai", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        prog="vendor-risk-ai",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("command", choices=["all", *STEPS], help="step to run")
-    parser.add_argument("--no-infra", action="store_true",
-                        help="with 'all': skip docker compose (services already running)")
+    parser.add_argument(
+        "--no-infra",
+        action="store_true",
+        help="with 'all': skip docker compose (services already running)",
+    )
     args = parser.parse_args(argv)
     configure_logging(get_settings().log_level)
 

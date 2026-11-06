@@ -52,9 +52,11 @@ class Settings(BaseSettings):
 
     @property
     def use_fake_llm(self) -> bool:
-        return self.llm_provider == "fake" or not self.openai_api_key.get_secret_value().startswith(
-            "sk-"
-        ) or self.openai_api_key.get_secret_value() == "sk-replace-me"
+        return (
+            self.llm_provider == "fake"
+            or not self.openai_api_key.get_secret_value().startswith("sk-")
+            or self.openai_api_key.get_secret_value() == "sk-replace-me"
+        )
 
 
 @lru_cache
