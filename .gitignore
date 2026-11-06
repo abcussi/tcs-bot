@@ -13,3 +13,9 @@ build/
 .DS_Store
 data/runtime/
 .claude/settings.local.json
+
+# medallion generated output (gold artifacts, local inbox drops)
+data/gold/
+data/bronze/inbox/*
+!data/bronze/inbox/README.md
+!data/bronze/inbox/.gitkeep
