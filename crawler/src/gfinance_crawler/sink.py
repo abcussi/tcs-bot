@@ -33,6 +33,10 @@ QUOTES_MAPPING: dict[str, Any] = {
     }
 }
 
+# Must match ``vendor_risk_ai.search.elastic._INDEX_SETTINGS``: whichever process creates
+# ``market-quotes`` first wins (single-node ES -> 0 replicas, otherwise the index is yellow).
+QUOTES_INDEX_SETTINGS: dict[str, Any] = {"number_of_shards": 1, "number_of_replicas": 0}
+
 
 class ElasticSink:
     def __init__(self, settings: CrawlerSettings | None = None, client: Any | None = None) -> None:
@@ -45,7 +49,9 @@ class ElasticSink:
         if self.client.indices.exists(index=self.index_name):
             return
         try:
-            self.client.indices.create(index=self.index_name, mappings=QUOTES_MAPPING)
+            self.client.indices.create(
+                index=self.index_name, mappings=QUOTES_MAPPING, settings=QUOTES_INDEX_SETTINGS
+            )
             log.info("created index %s", self.index_name)
         except BadRequestError as exc:  # created concurrently by another process
             if "resource_already_exists" not in str(exc.message):

@@ -23,3 +23,9 @@ Config (env / `.env`): `CRAWLER_TICKERS`, `CRAWLER_CRON`, `CRAWLER_BASE_URL`,
   indexed. Doc id `{ticker}:{exchange}:{YYYYmmddHHMM}` makes re-runs within a minute idempotent.
 - Exit code is 0 even with failed tickers; 1 only when Elasticsearch is unreachable and nothing
   was indexed. Honors `HTTPS_PROXY` / `SSL_CERT_FILE` (httpx `trust_env`).
+- `market-quotes` is created with the same mapping and settings (1 shard, 0 replicas) as the
+  main app's `search.elastic.ensure_indices()`; `tests/unit/test_quotes_mapping_parity.py` guards it.
+- Image: supercronic is downloaded per `TARGETARCH` (amd64 | arm64) and verified against
+  `SUPERCRONIC_SHA1SUM_AMD64` / `SUPERCRONIC_SHA1SUM_ARM64`. The arm64 checksum is not pinned
+  yet (empty => verification skipped with a warning); pass
+  `--build-arg SUPERCRONIC_SHA1SUM_ARM64=<sha1>` or pin it when bumping `SUPERCRONIC_VERSION`.

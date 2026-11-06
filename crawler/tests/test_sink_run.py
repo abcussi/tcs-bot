@@ -30,8 +30,10 @@ class FakeIndices:
     def exists(self, index: str) -> bool:
         return self._exists
 
-    def create(self, index: str, mappings: dict[str, Any]) -> None:
-        self.created.append({"index": index, "mappings": mappings})
+    def create(
+        self, index: str, mappings: dict[str, Any], settings: dict[str, Any] | None = None
+    ) -> None:
+        self.created.append({"index": index, "mappings": mappings, "settings": settings})
         self._exists = True
 
 
@@ -68,11 +70,18 @@ def test_ensure_index_creates_explicit_mapping(settings: CrawlerSettings) -> Non
     assert set(props) == set(Quote.model_fields)
 
 
+def test_ensure_index_single_node_settings(settings: CrawlerSettings) -> None:
+    """AC-002.4 / spec 002 plan (mapping parity): 1 shard, 0 replicas, like the main app."""
+    es = FakeES()
+    ElasticSink(settings, client=es).ensure_index()
+    assert es.indices.created[0]["settings"] == {"number_of_shards": 1, "number_of_replicas": 0}
+
+
 def test_ensure_index_tolerates_race(settings: CrawlerSettings) -> None:
     """AC-002.4 concurrent creation (resource_already_exists) is not an error."""
     es = FakeES()
 
-    def create(index: str, mappings: dict[str, Any]) -> None:
+    def create(index: str, mappings: dict[str, Any], **_: Any) -> None:
         raise BadRequestError("resource_already_exists_exception", meta=None, body={})  # type: ignore[arg-type]
 
     es.indices.create = create  # type: ignore[method-assign]
