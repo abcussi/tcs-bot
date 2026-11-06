@@ -18,9 +18,14 @@ Notes
 - `es_error` is an extra summary key (superset of AC-002.6) used for the exit code.
 
 ## Open (architect review 2026-11-06)
-- [ ] `sink.py:48` create the index with `settings={"number_of_shards": 1, "number_of_replicas": 0}`
+- [x] `sink.py:48` create the index with `settings={"number_of_shards": 1, "number_of_replicas": 0}`
       (today a crawler-first create gives 1 replica -> yellow on single-node ES).
-- [ ] Contract test in `tests/unit` asserting `gfinance_crawler.sink.QUOTES_MAPPING ==
+- [x] Contract test in `tests/unit` asserting `gfinance_crawler.sink.QUOTES_MAPPING ==
       vendor_risk_ai.search.elastic.QUOTES_MAPPING` and `set(Quote.model_fields) == mapping props`.
-- [ ] `crawler/Dockerfile:22-23`: per-arch supercronic checksum (amd64/arm64) instead of a single
+- [x] `crawler/Dockerfile:22-23`: per-arch supercronic checksum (amd64/arm64) instead of a single
       SHA1 that breaks BuildKit builds on arm64 (TARGETARCH=arm64 downloads the arm64 binary).
+
+Resolution notes (developer, 2026-11-06)
+- `sink.QUOTES_INDEX_SETTINGS` = 1 shard / 0 replicas; parity test `tests/unit/test_quotes_mapping_parity.py`.
+- Dockerfile: `SUPERCRONIC_SHA1SUM_AMD64` (pinned) / `SUPERCRONIC_SHA1SUM_ARM64` (empty = not
+  verified, warning printed) selected by `TARGETARCH`; pin the arm64 SHA1 from the release page.

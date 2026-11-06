@@ -36,6 +36,7 @@ class DocumentRepository:
     def list_for_vendor(self, vendor_id: int) -> list[VendorDocument]
     def save_chunks(self, document_id: int, chunks: list[ChunkRecord]) -> int
     def chunks_for_vendor(self, vendor_id: int) -> list[ChunkRecord]
+    def chunk_ids_for_vendor(self, vendor_id: int) -> list[tuple[int, int]]   # (document_id, chunk_index), no embeddings
 class ReportRepository:
     def save(self, vendor_id: int, report: RiskReport, model: str) -> int
     def latest(self, vendor_id: int) -> StoredReport | None
@@ -53,7 +54,9 @@ def get_cache() -> TwoTierCache
 def get_es() -> Elasticsearch
 def ensure_indices() -> None
 def index_chunks(vendor_id: int, chunks: list[ChunkRecord]) -> int
-def latest_quote(ticker: str) -> dict | None       # newest doc from market-quotes by ticker
+def latest_quote(ticker: str, *, raise_on_error: bool = False) -> dict | None  # newest doc by ticker
+def latest_quote_strict(ticker: str) -> dict | None  # raises SearchUnavailable when ES errors
+class SearchUnavailable(RuntimeError)
 def ping() -> bool
 ```
 Domain models (`Vendor`, `VendorCreate`, `DocumentCreate`, `VendorDocument`, `ChunkRecord`;
@@ -71,7 +74,7 @@ Domain models (`Vendor`, `VendorCreate`, `DocumentCreate`, `VendorDocument`, `Ch
 - `market-quotes` is created by whichever side runs first (`ensure_indices()` here or
   `gfinance_crawler.sink.ElasticSink.ensure_index()`). Both MUST use the identical mapping
   (`QUOTES_MAPPING`, currently equal) and identical index settings (1 shard, 0 replicas). The
-  crawler cannot import this package, so parity is enforced by a unit test in `tests/unit` that
-  imports both mappings (open task, specs/002 tasks.md).
+  crawler cannot import this package, so parity is enforced by
+  `tests/unit/test_quotes_mapping_parity.py` (imports both mappings and settings).
 - `vendor-chunks.embedding` is `dense_vector` dims 1536 / cosine: vectors of other lengths are
   dropped (text kept); all-zero vectors are rejected by ES cosine (partial bulk error, logged).

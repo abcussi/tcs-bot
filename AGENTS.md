@@ -24,6 +24,7 @@ Market context (quotes) is scraped from Google Finance by a separate cron crawle
 ```
 src/vendor_risk_ai/
   config.py            Settings (pydantic-settings, reads .env) -> get_settings()
+  errors.py            AppError hierarchy (framework-neutral; re-exported by api/errors.py)
   main.py              CLI orchestrator: `uv run vendor-risk-ai all` boots everything
   api/                 FastAPI app factory, routes, custom errors + handlers, deps
   schemas/             Pydantic I/O models (api.py, report.py, domain.py)
