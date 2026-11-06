@@ -19,8 +19,9 @@ except ImportError:  # mcp >= 2 renamed FastMCP -> MCPServer (same decorator API
     from mcp.server.mcpserver import MCPServer as FastMCP
     from mcp.server.mcpserver.exceptions import ToolError
 
-from vendor_risk_ai.api.errors import AppError
+from vendor_risk_ai.errors import AppError
 from vendor_risk_ai.schemas.api import ReportRequest, VendorOut
+from vendor_risk_ai.schemas.report import RiskReport
 
 if TYPE_CHECKING:
     from vendor_risk_ai.services.report_service import ReportService
@@ -60,9 +61,12 @@ def generate_vendor_risk_report(
     vendor_id: int | None = None,
     vendor_name: str | None = None,
     focus_areas: list[str] | None = None,
-) -> dict[str, Any]:
+) -> RiskReport:
     """Generate a structured vendor risk report (score 0-100, risk level, red flags, financial
-    health, compliance recommendations, sources, data gaps). Give vendor_id or vendor_name."""
+    health, compliance recommendations, sources, data gaps). Give vendor_id or vendor_name.
+
+    Returns a ``RiskReport``: the tool's MCP ``outputSchema`` is the RiskReport JSON schema and
+    the result's ``structuredContent`` is its JSON dump."""
     try:
         req = ReportRequest(
             vendor_id=vendor_id, vendor_name=vendor_name, focus_areas=focus_areas or []
@@ -70,7 +74,7 @@ def generate_vendor_risk_report(
     except ValidationError as exc:
         raise ToolError(f"validation_error: {exc.errors()[0]['msg']}") from exc
     try:
-        return get_service().generate_report(req).model_dump(mode="json")
+        return get_service().generate_report(req)
     except AppError as exc:
         raise _tool_error(exc) from exc
 
