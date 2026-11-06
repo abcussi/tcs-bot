@@ -81,8 +81,13 @@ Offline input: drop `.html/.txt/.json/.pdf` files into `data/bronze/inbox/`.
 **Data dictionary** (fields, ids, score formula, example queries): [docs/DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md).
 
 **View the graph:** open `data/gold/tcs_risk_graph.html` in a browser (self-contained, no network).
-The same data is served at `GET /tcs/risks/{search?q=&k=,summary,graph}` and by the MCP tool
-`search_tcs_risks`.
+The same data is served at `GET /tcs/risks/{search?q=&k=,summary,graph}`.
+
+**Use the data from code:** the typed read layer `tcs_bot.medallion.read` (`get_tcs_data()`) joins
+bronze, silver and gold by document id. HTTP: `GET /tcs/risks/documents` (filters, sort, paging),
+`/documents/{id}`, `/documents/{id}/similar`, `/categories`, `/overview`, `/clusters`,
+`/clusters/{id}`. MCP tools: `search_tcs_risks`, `list_tcs_risks`, `get_tcs_risk_document`,
+`similar_tcs_risks`, `tcs_risk_clusters`. Details: [docs/DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md).
 
 **Embeddings:** OpenAI `text-embedding-3-small` when `OPENAI_API_KEY` is set and
 `LLM_PROVIDER=openai`; otherwise an offline TF-IDF+SVD ("LSA") embedder. Index names include the

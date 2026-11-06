@@ -47,13 +47,22 @@ PHASES: list[tuple[str, str, str]] = [
     (
         "f140008",
         "8. Medallion layers (bronze, silver, gold)",
-        "Crawler sources + BFS, silver extraction/rules/ES, gold LSA/Qdrant/graph. "
-        "The wip(...) commits hold this code; it was verified later, see phase 9.",
+        "Crawler sources + BFS, silver extraction/rules/ES, gold LSA/graph (vectors were in Qdrant "
+        "at this point, moved to Elasticsearch in phase 10). "
+        "The wip(...) commits hold this code; it was verified later, see phases 9 and 10.",
     ),
     (
         "a6e0f4e",
-        "9. Handoff and local verification",
-        "Run on a real machine: real-crawl fixes, CI, docs.",
+        "9. Handoff and first local verification",
+        "First run on a real machine: real-internet crawl fixes, CI Qdrant service, README, "
+        "graph page checked in a real browser.",
+    ),
+    (
+        "147ec8e",
+        "10. Real-data tuning, Elasticsearch gold, read layer",
+        "Silver relevance/risk tuned on real crawled docs, gold dedupe and clustering, "
+        "gold vectors moved to Elasticsearch (Qdrant dropped), cross-run Bing dedupe, "
+        "typed read layer + API/MCP tools, data dictionary.",
     ),
 ]
 
