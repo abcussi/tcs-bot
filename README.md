@@ -78,6 +78,8 @@ uv run tcs-bot medallion schedule --cron "0 */6 * * *"     # recurring (Compose 
 ```
 Offline input: drop `.html/.txt/.json/.pdf` files into `data/bronze/inbox/`.
 
+**Data dictionary** (fields, ids, score formula, example queries): [docs/DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md).
+
 **View the graph:** open `data/gold/tcs_risk_graph.html` in a browser (self-contained, no network).
 The same data is served at `GET /tcs/risks/{search?q=&k=,summary,graph}` and by the MCP tool
 `search_tcs_risks`.
