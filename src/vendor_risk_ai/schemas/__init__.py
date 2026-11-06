@@ -16,7 +16,16 @@ from vendor_risk_ai.schemas.report import (
 )
 
 __all__ = [
-    "ChunkRecord", "ComplianceRecommendation", "DocumentCreate", "FinancialHealth", "RedFlag",
-    "RiskReport", "SourceRef", "StoredReport", "Vendor", "VendorCreate", "VendorDocument",
+    "ChunkRecord",
+    "ComplianceRecommendation",
+    "DocumentCreate",
+    "FinancialHealth",
+    "RedFlag",
+    "RiskReport",
+    "SourceRef",
+    "StoredReport",
+    "Vendor",
+    "VendorCreate",
+    "VendorDocument",
     "score_to_level",
 ]
