@@ -225,7 +225,9 @@ def test_dashboard_stats(X: np.ndarray, records: list[SilverRecord]) -> None:
     assert sum(m["count"] for m in tl) == 30 and tl == sorted(tl, key=lambda m: m["month"])
     risky = A.top_risky(records)
     assert len(risky) == 15
-    assert [r["risk_score"] for r in risky] == sorted((r["risk_score"] for r in risky), reverse=True)
+    assert [r["risk_score"] for r in risky] == sorted(
+        (r["risk_score"] for r in risky), reverse=True
+    )
     pairs = A.top_cross_source_pairs(S, records)
     assert len(pairs) == 20
     assert all(p["a_domain"] != p["b_domain"] for p in pairs)

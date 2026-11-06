@@ -8,6 +8,7 @@ of ``(kind, doc_id, chunk_index)``: re-running gold overwrites instead of duplic
 from __future__ import annotations
 
 import uuid
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -129,7 +130,9 @@ class GoldVectorStore:
                 ("source_type", models.PayloadSchemaType.KEYWORD),
             ):
                 try:  # local (:memory:) mode has no payload indexes; harmless there
-                    self.client.create_payload_index(name, field, field_schema=schema)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", UserWarning)
+                        self.client.create_payload_index(name, field, field_schema=schema)
                 except Exception as exc:  # pragma: no cover - server-side best effort
                     log.debug("gold.qdrant.payload_index_skipped", field=field, error=str(exc))
             log.info("gold.qdrant.collection_created", collection=name, dim=dim)

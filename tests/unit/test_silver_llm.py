@@ -44,12 +44,12 @@ def test_chain_constructs_with_structured_output_no_network():
     s = _openai_settings()
     assert not s.use_fake_llm
     chain = build_silver_chain(s)
-    prompt, structured = chain.bound.first, chain.bound.last
+    prompt, binding, *_ = chain.bound.steps
     assert set(prompt.input_variables) == {"source", "url", "title", "text"}
-    llm = structured.first.bound  # RunnableBinding(ChatOpenAI, tools=[...])
+    llm = binding.bound  # RunnableBinding(ChatOpenAI, tools=[LlmSilverOutput])
     assert llm.model_name == "gpt-4.1-mini"
     assert llm.temperature == 0.0
-    tool = structured.first.kwargs["tools"][0]["function"]
+    tool = binding.kwargs["tools"][0]["function"]
     assert tool["name"] == "LlmSilverOutput"
     assert {"risk_signals", "entities", "summary", "sentiment", "tcs_relevance"} <= set(
         tool["parameters"]["properties"]
@@ -71,7 +71,8 @@ def test_merge_with_rules_grounded_signals_only():
                 category="operational_delivery",
                 severity="medium",
                 keyword="project pause",
-                evidence="Tata Consultancy Services (TCS) said a fictional client paused a project.",
+                evidence="Tata Consultancy Services (TCS) said a fictional client paused a "
+                "project.",
             ),
             RiskSignal(  # hallucinated evidence -> dropped
                 category="ethics",

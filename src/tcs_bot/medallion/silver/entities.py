@@ -254,7 +254,8 @@ _ORG_SUFFIX = (
     r"(?:Ltd|Limited|Inc|Incorporated|Corp|Corporation|LLC|LLP|PLC|plc|AG|GmbH|SA|NV|Bank"
     r"|Group|Systems|Technologies|Technology|Holdings|Services|Solutions|Consulting|Partners)"
 )
-_ORG_RX = re.compile(rf"\b((?:[A-Z][\w&'.-]*\s+){{0,4}}[A-Z][\w&'.-]*\s+{_ORG_SUFFIX})\b\.?")
+_ORG_TOKEN = r"[A-Z][\w&'-]*(?:\.[\w&'-]+)*"  # no trailing period: never spans sentences
+_ORG_RX = re.compile(rf"\b((?:{_ORG_TOKEN}[ \t]+){{0,4}}{_ORG_TOKEN}[ \t]+{_ORG_SUFFIX})\b\.?")
 _LEGAL_SUFFIX_RX = re.compile(
     r"\s+(?:Ltd|Limited|Inc|Incorporated|Corp|Corporation|LLC|PLC|plc)\.?$"
 )

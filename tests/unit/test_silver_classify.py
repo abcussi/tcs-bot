@@ -25,7 +25,9 @@ THRESHOLD = 0.35  # settings.medallion_relevance_threshold default
 
 
 def _sev(signals, category):
-    return max((SEVERITIES.index(s.severity) for s in signals if s.category == category), default=-1)
+    return max(
+        (SEVERITIES.index(s.severity) for s in signals if s.category == category), default=-1
+    )
 
 
 def test_taxonomy_covers_every_category():
@@ -64,7 +66,9 @@ def test_negation_lowers_severity_one_level():
     none, _ = classify("Auditors found no evidence of bribery at TCS.", "")
     assert _sev(none, "ethics") == SEVERITIES.index("high")
     # "dismissed 200 employees" is a labour event, not a negation
-    fired, _ = classify("TCS dismissed 200 employees in a lawsuit-free restructuring of layoffs.", "")
+    fired, _ = classify(
+        "TCS dismissed 200 employees in a lawsuit-free restructuring of layoffs.", ""
+    )
     assert _sev(fired, "labor_hr") == SEVERITIES.index("high")
 
 

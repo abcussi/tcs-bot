@@ -35,6 +35,7 @@ _MIN_TRAFILATURA_WORDS = 20
 _DROP_TAGS = ("script", "style", "noscript", "nav", "footer", "header", "aside", "form", "svg")
 _REMOVED = {"[deleted]", "[removed]", ""}
 _WORD = re.compile(r"\w+")
+_INLINE_WS = re.compile(r"[^\S\n]+")
 
 
 # --------------------------------------------------------------------------- helpers
@@ -47,7 +48,7 @@ def strip_html(fragment: str | None) -> str:
     soup = BeautifulSoup(fragment, "lxml")
     for br in soup.find_all(["br", "p", "li"]):
         br.insert_before("\n")
-    return html.unescape(soup.get_text(" "))
+    return _INLINE_WS.sub(" ", html.unescape(soup.get_text(" ")))
 
 
 def _join(parts: list[str]) -> str:
@@ -125,8 +126,8 @@ def _extract_html(raw: str, url: str) -> tuple[str, str | None]:
     soup = BeautifulSoup(raw, "lxml")
     title = _html_title(raw, soup)
     if len(_WORD.findall(text)) < _MIN_TRAFILATURA_WORDS:
-        fallback = _bs4_text(soup)
-        if len(fallback) > len(text):
+        fallback = _bs4_text(soup)  # nav/script/footer stripped: cleaner for tiny pages
+        if fallback:
             text = fallback
     return normalize_text(text), title
 
