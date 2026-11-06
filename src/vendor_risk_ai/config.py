@@ -5,8 +5,18 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from vendor_risk_ai.logging_setup import get_logger
+
+log = get_logger(__name__)
+
+# Constitution §3 pins the models. Embedding models must produce 1536-dim vectors: the
+# HashEmbedder fallback, the retriever and the ES ``dense_vector`` mapping all assume it.
+CONSTITUTION_CHAT_MODEL = "gpt-4.1-mini"
+CONSTITUTION_TEMPERATURE = 0.0
+EMBEDDING_MODEL_DIMS: dict[str, int] = {"text-embedding-3-small": 1536}
 
 
 class Settings(BaseSettings):
@@ -49,6 +59,33 @@ class Settings(BaseSettings):
 
     # Seed
     seed_file: str = "data/seed/vendors.json"
+
+    @field_validator("openai_embedding_model")
+    @classmethod
+    def _embedding_model_is_1536d(cls, v: str) -> str:
+        if EMBEDDING_MODEL_DIMS.get(v) != 1536:
+            allowed = ", ".join(sorted(m for m, d in EMBEDDING_MODEL_DIMS.items() if d == 1536))
+            raise ValueError(
+                f"unsupported embedding model {v!r}: must produce 1536-dim vectors ({allowed})"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _warn_constitution_drift(self) -> Settings:
+        # Overrides stay possible (experiments), but are loud: constitution §3 pins these.
+        if self.openai_temperature != CONSTITUTION_TEMPERATURE:
+            log.warning(
+                "config.temperature_override",
+                temperature=self.openai_temperature,
+                expected=CONSTITUTION_TEMPERATURE,
+            )
+        if self.openai_chat_model != CONSTITUTION_CHAT_MODEL:
+            log.warning(
+                "config.chat_model_override",
+                model=self.openai_chat_model,
+                expected=CONSTITUTION_CHAT_MODEL,
+            )
+        return self
 
     @property
     def use_fake_llm(self) -> bool:
