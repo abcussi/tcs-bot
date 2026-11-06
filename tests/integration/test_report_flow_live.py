@@ -252,13 +252,6 @@ def test_market_quote_enrichment(live_stack, service, cleanup):
     assert any("market move" in f.description for f in report.red_flags)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "BUG: ReportService.ingest_document inserts the vendor_documents row (+ audit) before "
-        "_chunk_and_store rejects whitespace-only content -> orphan document without chunks"
-    ),
-)
 def test_rejected_empty_document_leaves_no_row(live_stack, service, cleanup):
     """AC-003.2, constitution §5: a document rejected as empty must not be persisted."""
     from vendor_risk_ai.api.errors import ValidationAppError
