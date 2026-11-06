@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import structlog
 
 
 def configure_logging(level: str = "INFO") -> None:
-    logging.basicConfig(level=level, format="%(message)s")
+    """Logs go to stderr so stdout stays clean for the MCP stdio transport."""
+    logging.basicConfig(level=level, format="%(message)s", stream=sys.stderr)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -17,6 +19,7 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(level)),
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
     )
 
 
