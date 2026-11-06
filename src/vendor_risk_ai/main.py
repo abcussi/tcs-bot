@@ -98,6 +98,14 @@ def step_crawl() -> None:
         log.warning("crawl_failed", error=str(exc))
 
 
+def step_crawl_background() -> None:
+    """Used by `all`: an unreachable Google Finance can take minutes of retries,
+    so the first crawl runs in a daemon thread and the API starts immediately."""
+    import threading
+
+    threading.Thread(target=step_crawl, name="initial-crawl", daemon=True).start()
+
+
 # ---------------------------------------------------------------- servers
 def step_api() -> None:
     import uvicorn
@@ -123,7 +131,8 @@ STEPS: dict[str, Callable[[], None]] = {
     "api": step_api,
     "mcp": step_mcp,
 }
-PIPELINE = ["up", "migrate", "seed", "index", "crawl", "api"]
+PIPELINE = ["up", "migrate", "seed", "index", "crawl-bg", "api"]
+STEPS_INTERNAL: dict[str, Callable[[], None]] = {**STEPS, "crawl-bg": step_crawl_background}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -146,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         steps = [s for s in steps if s != "up"]
     for name in steps:
         log.info("step", name=name)
-        STEPS[name]()
+        STEPS_INTERNAL[name]()
     return 0
 
 
