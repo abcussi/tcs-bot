@@ -214,3 +214,36 @@ def test_default_per_query_limit_reserves_budget(web):
     assert crawler._limit_for(20) == 2
     big = _crawler(web, per_query_limit=None, max_docs=500)
     assert big._limit_for(1) == 500 // (3 * 5)
+
+
+def test_search_metadata_echo_does_not_make_hn_hits_relevant():
+    """Real shape: ``_highlightResult.matchedWords`` echoes the query ("tcs"); only the hit whose
+    own text mentions TCS is stored (hit 1 is about T&Cs / terms and conditions)."""
+    web = FakeWeb()
+    web.add(
+        "https://hn.algolia.com/api/v1/search",
+        news_fixture("hn_search_highlight.json"),
+        ctype="application/json",
+    )
+    f = PoliteFetcher(client=web.client(), delay=0, sleep=lambda s: None)
+    crawler = RiskCrawler([HackerNews(f)], f, max_depth=0, per_query_limit=5)
+    docs = list(crawler.crawl(["TCS lawsuit"]))
+    assert [d.url for d in docs] == ["https://news.ycombinator.com/item?id=90000202"]
+    assert crawler.stats["skipped_irrelevant"] == 1
+
+
+def test_blocked_publisher_keeps_depth0_item_and_counts_blocked():
+    """Real behaviour: publishers answer 403 to bots. The RSS item stays as depth-0 content."""
+    web = full_news_web()
+    web.add(
+        "https://economictimes.indiatimes.com/tech/tcs-synthetic-lawsuit/articleshow/1001.cms",
+        "forbidden",
+        status=403,
+    )
+    f = PoliteFetcher(client=web.client(), delay=0, sleep=lambda s: None)
+    crawler = RiskCrawler([BingNewsRSS(f)], f, per_query_limit=10)
+    docs = list(crawler.crawl(["TCS lawsuit"]))
+    assert any(d.depth == 0 and "tcs-synthetic-lawsuit" in d.raw_content for d in docs)
+    assert not any(d.depth == 1 and "tcs-synthetic-lawsuit" in d.url for d in docs)
+    assert crawler.stats["blocked"] >= 1
+    assert any("HTTP 403" in e for e in crawler.stats["errors"])

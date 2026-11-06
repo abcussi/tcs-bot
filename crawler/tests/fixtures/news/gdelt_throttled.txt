@@ -1,0 +1,2 @@
+Please slow down: this synthetic endpoint allows one request every few seconds.
+(SYNTHETIC FIXTURE: invented wording, mirrors only the shape - a plain-text body, not JSON.)

@@ -1,0 +1,62 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE: invented HN Algolia search response mirroring the real shape (incl. _highlightResult echoing the query terms); not real posts.",
+  "exhaustive": {"nbHits": false, "typo": false},
+  "exhaustiveNbHits": false,
+  "exhaustiveTypo": false,
+  "hits": [
+    {
+      "_highlightResult": {
+        "author": {"matchLevel": "none", "matchedWords": [], "value": "synthetic_a"},
+        "comment_text": {
+          "fullyHighlighted": false,
+          "matchLevel": "partial",
+          "matchedWords": ["tcs", "lawsuit"],
+          "value": "SYNTHETIC comment about a fictional mobile-phone store and its <em>lawsuit</em> over T&amp;Cs."
+        },
+        "story_title": {"matchLevel": "none", "matchedWords": [], "value": "SYNTHETIC: fictional store policy thread"}
+      },
+      "_tags": ["comment", "author_synthetic_a", "story_90000101"],
+      "author": "synthetic_a",
+      "children": [],
+      "comment_text": "SYNTHETIC comment about a fictional mobile-phone store and its lawsuit over T&amp;Cs.",
+      "created_at": "2026-10-01T10:00:00Z",
+      "created_at_i": 1790848800,
+      "objectID": "90000102",
+      "parent_id": 90000101,
+      "story_id": 90000101,
+      "story_title": "SYNTHETIC: fictional store policy thread",
+      "story_url": "https://example.org/synthetic-store-policy",
+      "updated_at": "2026-10-02T10:00:00Z"
+    },
+    {
+      "_highlightResult": {
+        "author": {"matchLevel": "none", "matchedWords": [], "value": "synthetic_b"},
+        "comment_text": {
+          "fullyHighlighted": false,
+          "matchLevel": "full",
+          "matchedWords": ["tcs", "lawsuit"],
+          "value": "SYNTHETIC: a <em>TCS</em> <em>lawsuit</em> was mentioned in an invented thread."
+        }
+      },
+      "_tags": ["comment", "author_synthetic_b", "story_90000201"],
+      "author": "synthetic_b",
+      "children": [],
+      "comment_text": "SYNTHETIC: a TCS lawsuit was mentioned in an invented thread.",
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "created_at_i": 1791021600,
+      "objectID": "90000202",
+      "parent_id": 90000201,
+      "story_id": 90000201,
+      "story_title": "SYNTHETIC: invented vendor litigation thread",
+      "story_url": "https://example.org/synthetic-vendor-litigation",
+      "updated_at": "2026-10-03T11:00:00.000Z"
+    }
+  ],
+  "hitsPerPage": 5,
+  "nbHits": 2,
+  "nbPages": 1,
+  "page": 0,
+  "params": "query=SYNTHETIC",
+  "processingTimeMS": 1,
+  "query": "SYNTHETIC"
+}

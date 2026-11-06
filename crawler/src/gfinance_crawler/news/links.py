@@ -141,8 +141,26 @@ def html_title(html: str) -> str | None:
     return _clean(h1.get_text(" ")) or None
 
 
+def _json_strings(node: Any, out: list[str]) -> None:
+    if isinstance(node, str):
+        out.append(node)
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            if key == "_highlightResult":  # Algolia search metadata (echoes the query terms)
+                continue
+            _json_strings(value, out)
+    elif isinstance(node, list):
+        for value in node:
+            _json_strings(value, out)
+
+
 def visible_text(content: str, content_type: str) -> str:
-    """Rough plain text used for relevance checks (not the silver extractor)."""
+    """Rough plain text used for relevance checks (not the silver extractor).
+
+    HTML -> visible text; JSON -> its string values only (keys and Algolia ``_highlightResult``
+    metadata are dropped so that the *query terms* echoed back by a search API never make an
+    unrelated hit look TCS-relevant).
+    """
     if "html" in (content_type or "").lower() or content.lstrip()[:1] == "<":
         try:
             soup = BeautifulSoup(content, "lxml")
@@ -151,6 +169,14 @@ def visible_text(content: str, content_type: str) -> str:
             return _clean(soup.get_text(" "))
         except Exception:  # noqa: BLE001
             return content
+    if "json" in (content_type or "").lower() or content.lstrip()[:1] in "{[":
+        try:
+            data = json.loads(content)
+        except ValueError:
+            return content
+        parts: list[str] = []
+        _json_strings(data, parts)
+        return " ".join(html_lib.unescape(p) for p in parts)
     return content
 
 
@@ -172,6 +198,11 @@ _TAX_NEAR = re.compile(
     r"|\bTCS\s+(?:rate|deduct|refund|credit|on)\b",
     re.IGNORECASE,
 )
+# "TCS" used for something else (e.g. the "Taking Children Seriously" parenting philosophy).
+_OTHER_TCS = re.compile(
+    r"taking\s+children\s+seriously|unconditional\s+parenting",
+    re.IGNORECASE,
+)
 _WINDOW = 80
 
 
@@ -191,6 +222,6 @@ def is_tcs_relevant(text: str) -> bool:
         return False
     for m in _BARE.finditer(text):
         window = text[max(0, m.start() - _WINDOW) : m.end() + _WINDOW]
-        if not _TAX_NEAR.search(window):
+        if not _TAX_NEAR.search(window) and not _OTHER_TCS.search(window):
             return True
     return False

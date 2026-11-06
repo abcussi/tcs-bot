@@ -113,7 +113,9 @@ class _HttpSource:
         try:
             return json.loads(result.text)
         except ValueError as exc:
-            raise SearchError(self.name, url, f"invalid JSON: {exc}", False) from exc
+            # GDELT & co. answer throttling / bad queries with a plain-text body (HTTP 200)
+            hint = " ".join(result.text.split())[:120]
+            raise SearchError(self.name, url, f"invalid JSON ({exc}): {hint!r}", False) from exc
 
 
 # ------------------------------------------------------------------ RSS (Google / Bing)
@@ -133,7 +135,12 @@ def _rss_items(xml: str) -> list[tuple[Any, str]]:
 
 class GoogleNewsRSS(_HttpSource):
     """Google News search RSS (India edition). Item links are ``news.google.com`` redirects and
-    are kept as-is (url + follow_url); the publisher (``<source url=...>``) stays in raw_content."""
+    are kept as-is (url + follow_url); the publisher (``<source url=...>``) stays in raw_content.
+
+    Real-world note (probed 2026-11-06): news.google.com/robots.txt says ``User-agent: *`` /
+    ``Disallow: /`` (only /topics/, /publications/, ... are allowed), so ``/rss/search`` is
+    robots-disallowed for this crawler and every call raises ``SearchError(blocked=True)``. That
+    is respected, not bypassed; the parser is only exercised on synthetic fixtures."""
 
     name = "google_news"
     source_type: SourceType = "news"

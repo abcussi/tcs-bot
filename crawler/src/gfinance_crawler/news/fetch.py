@@ -18,8 +18,11 @@ log = logging.getLogger(__name__)
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; VendorRiskBot/0.1; TCS vendor-risk research crawler)"
 ROBOTS_AGENT = "VendorRiskBot"
-BLOCKED_STATUSES = {401, 403, 451}
+BLOCKED_STATUSES = {401, 403, 429, 451}  # 429 = throttled: report as blocked, never retry/bypass
 MAX_TEXT_CHARS = 2_000_000  # bronze column is MEDIUMTEXT (16 MiB of utf8mb4)
+# Hosts that publish a stricter rate limit than the default delay (GDELT: one request / 5 s,
+# otherwise it answers 429 / plain-text errors).
+DEFAULT_HOST_DELAYS: dict[str, float] = {"api.gdeltproject.org": 5.5}
 _TEXTUAL = ("text/", "json", "xml", "rss", "atom", "javascript")
 
 
@@ -51,9 +54,9 @@ def pdf_to_text(data: bytes) -> str | None:
 
 class PoliteFetcher:
     """GET with robots.txt (cached per origin, fetched through the same client; any robots fetch
-    failure => allow), per-domain delay, tenacity retries on transport errors / 5xx / 429.
+    failure => allow), per-domain delay, tenacity retries on transport errors / 5xx (never on 429).
 
-    ``fetch`` never raises. 401/403/451, robots disallow and proxy CONNECT refusals give
+    ``fetch`` never raises. 401/403/429/451, robots disallow and proxy CONNECT refusals give
     ``blocked=True``.
     """
 
@@ -69,6 +72,7 @@ class PoliteFetcher:
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
         robots_agent: str = ROBOTS_AGENT,
+        host_delays: dict[str, float] | None = None,
     ) -> None:
         self._owns_client = client is None
         self.client = client or httpx.Client(
@@ -83,6 +87,7 @@ class PoliteFetcher:
         )
         self.user_agent = user_agent
         self.delay = max(0.0, delay)
+        self.host_delays = dict(DEFAULT_HOST_DELAYS if host_delays is None else host_delays)
         self.robots = robots
         self.robots_agent = robots_agent
         self._sleep = sleep
@@ -112,8 +117,9 @@ class PoliteFetcher:
     # ------------------------------------------------------------------ politeness
     def _wait_turn(self, host: str) -> None:
         last = self._last.get(host)
-        if last is not None and self.delay > 0:
-            remaining = self.delay - (self._clock() - last)
+        delay = max(self.delay, self.host_delays.get(host, 0.0)) if self.delay > 0 else self.delay
+        if last is not None and delay > 0:
+            remaining = delay - (self._clock() - last)
             if remaining > 0:
                 self._sleep(remaining)
         self._last[host] = self._clock()
@@ -122,7 +128,7 @@ class PoliteFetcher:
         self._wait_turn(urlsplit(url).netloc.lower())
         self.requests += 1
         response = self.client.get(url)
-        if response.status_code == 429 or response.status_code >= 500:
+        if response.status_code >= 500:  # 429 is NOT retried: back off by reporting it blocked
             raise _RetryableStatus(response)
         return response
 
@@ -181,7 +187,10 @@ class PoliteFetcher:
         ctype = _ctype(r)
         base = {"url": url, "final_url": str(r.url), "status": r.status_code, "content_type": ctype}
         if r.status_code in BLOCKED_STATUSES:
-            return FetchResult(**base, error=f"HTTP {r.status_code}", blocked=True)
+            why = "blocked"
+            if r.status_code == 429:  # GDELT explains itself in a plain-text body
+                why = "rate limited " + repr(" ".join(r.text.split())[:100])
+            return FetchResult(**base, error=f"HTTP {r.status_code} {why}", blocked=True)
         if not 200 <= r.status_code < 300:
             return FetchResult(**base, error=f"HTTP {r.status_code}")
         if "pdf" in ctype:

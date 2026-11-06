@@ -1,0 +1,7 @@
+# SYNTHETIC FIXTURE: robots.txt with the structure of a news aggregator that disallows everything
+# except a few listing paths; /rss/ is NOT among the allowed paths.
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /topics/
+Allow: /about/

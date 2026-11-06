@@ -68,7 +68,7 @@ def test_robots_can_be_disabled():
 
 
 def test_blocked_statuses():
-    for status in (401, 403, 451):
+    for status in (401, 403, 429, 451):
         web = FakeWeb()
         web.add(URL, "no", status=status)
         res = _fetcher(web).fetch(URL)
@@ -83,13 +83,38 @@ def test_proxy_connect_refusal_is_blocked_and_not_retried():
     assert len(web.fetched("/a")) == 1
 
 
-def test_retries_5xx_and_429_then_succeeds():
+def test_retries_5xx_then_succeeds():
     web = FakeWeb()
-    responses = iter([httpx.Response(503), httpx.Response(429), httpx.Response(200, text="ok")])
+    responses = iter([httpx.Response(503), httpx.Response(502), httpx.Response(200, text="ok")])
     web.add(URL, lambda request: next(responses))
     res = _fetcher(web, max_attempts=3).fetch(URL)
     assert res.ok and res.text == "ok"
     assert len(web.fetched("/a")) == 3
+
+
+def test_429_is_blocked_and_never_retried():
+    """Real GDELT/Reddit behaviour: throttled => report blocked, do not hammer or bypass."""
+    web = FakeWeb()
+    web.add(URL, news_fixture("gdelt_throttled.txt"), status=429, ctype="text/plain")
+    res = _fetcher(web, max_attempts=3).fetch(URL)
+    assert res.blocked and not res.ok and res.status == 429
+    assert "rate limited" in res.error and "slow down" in res.error  # body hint kept
+    assert len(web.fetched("/a")) == 1
+
+
+def test_gdelt_host_gets_a_minimum_5s_spacing():
+    web = FakeWeb()
+    gdelt = "https://api.gdeltproject.org/api/v2/doc/doc"
+    web.add(gdelt, "{}", ctype="application/json")
+    web.add("https://news.test/a", "ok", ctype="text/plain")
+    clock = Clock()
+    f = PoliteFetcher(client=web.client(), delay=1.0, sleep=clock.sleep, clock=clock, robots=False)
+    f.fetch(gdelt + "?q=1")
+    f.fetch(gdelt + "?q=2")
+    assert clock.sleeps == [5.5]
+    f.fetch("https://news.test/a")
+    f.fetch("https://news.test/a")
+    assert clock.sleeps == [5.5, 1.0]  # ordinary hosts keep the default delay
 
 
 def test_persistent_5xx_returns_error_never_raises():

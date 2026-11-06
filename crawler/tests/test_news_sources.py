@@ -210,3 +210,85 @@ def test_local_inbox_reads_supported_files(tmp_path):
     assert any("f_empty" in s for s in inbox.skipped)
     assert len(inbox.search("", 2)) == 2
     assert LocalInbox(tmp_path / "missing").search("", 10) == []
+
+
+# ------------------------------------------------ real response shapes (synthetic mirrors)
+def test_google_news_rss_is_blocked_when_robots_disallow_rss():
+    """Real news.google.com/robots.txt disallows /rss/ for generic agents: blocked, not bypassed."""
+    web = FakeWeb()
+    web.add(
+        "https://news.google.com/robots.txt",
+        news_fixture("robots_google_news_like.txt"),
+        ctype="text/plain",
+    )
+    web.add("https://news.google.com/rss/search", news_fixture("google_news.xml"))
+    with pytest.raises(SearchError) as exc:
+        GoogleNewsRSS(_fetcher(web)).search("TCS lawsuit", 5)
+    assert exc.value.blocked and "robots" in str(exc.value)
+    assert web.fetched("rss/search") == []
+
+
+def test_bing_empty_feed_returns_no_documents():
+    web = FakeWeb()
+    web.add(
+        "https://www.bing.com/news/search",
+        news_fixture("bing_news_empty.xml"),
+        ctype="application/xml",
+    )
+    assert BingNewsRSS(_fetcher(web)).search("TCS lawsuit", 5) == []
+
+
+def test_gdelt_plain_text_error_is_a_non_blocked_search_error_with_hint():
+    """GDELT answers bad/odd queries with HTTP 200 + a plain-text body."""
+    web = FakeWeb()
+    web.add(
+        "https://api.gdeltproject.org/api/v2/doc/doc",
+        news_fixture("gdelt_throttled.txt"),
+        ctype="text/html",
+    )
+    with pytest.raises(SearchError) as exc:
+        GdeltDoc(_fetcher(web)).search("TCS", 5)
+    assert not exc.value.blocked and "slow down" in str(exc.value)
+
+
+def test_gdelt_429_is_reported_blocked():
+    web = FakeWeb()
+    web.add(
+        "https://api.gdeltproject.org/api/v2/doc/doc",
+        news_fixture("gdelt_throttled.txt"),
+        status=429,
+        ctype="text/plain",
+    )
+    with pytest.raises(SearchError) as exc:
+        GdeltDoc(_fetcher(web)).search("TCS", 5)
+    assert exc.value.blocked and "429" in str(exc.value)
+    assert len(web.fetched("doc/doc")) == 1  # no retry
+
+
+def test_reddit_429_and_403_are_reported_blocked():
+    for status in (403, 429):
+        web = FakeWeb()
+        web.add("https://www.reddit.com/search.json", "nope", status=status, ctype="text/plain")
+        with pytest.raises(SearchError) as exc:
+            RedditSearch(_fetcher(web), subreddits=[]).search("TCS", 5)
+        assert exc.value.blocked
+
+
+def test_hackernews_real_shape_comment_hits():
+    """Comment hits have no ``title`` (story_title is used) and carry ``_highlightResult``."""
+    web = FakeWeb()
+    web.add(
+        "https://hn.algolia.com/api/v1/search",
+        news_fixture("hn_search_highlight.json"),
+        ctype="application/json",
+    )
+    docs = HackerNews(_fetcher(web)).search("TCS lawsuit", 5)
+    assert [d.url for d in docs] == [
+        "https://news.ycombinator.com/item?id=90000102",
+        "https://news.ycombinator.com/item?id=90000202",
+    ]
+    assert docs[0].title == "SYNTHETIC: fictional store policy thread"
+    assert docs[1].follow_url == "https://hn.algolia.com/api/v1/items/90000201"
+    assert docs[1].published_at == datetime(2026, 10, 3, 10, 0, tzinfo=UTC)
+    assert docs[0].published_at == datetime(2026, 10, 1, 10, 0, tzinfo=UTC)
+    assert "_highlightResult" in docs[0].raw_content  # bronze keeps the hit as fetched

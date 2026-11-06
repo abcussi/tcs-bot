@@ -10,6 +10,7 @@ from gfinance_crawler.news.links import (
     extract_links_json,
     html_title,
     is_tcs_relevant,
+    visible_text,
 )
 from gfinance_crawler.news.queries import (
     COMMUNITY_SUBREDDITS,
@@ -150,3 +151,23 @@ def test_query_set_and_domains_cover_spec():
     assert domain_allowed("www.livemint.com", DEFAULT_ALLOWED_DOMAINS)
     assert not domain_allowed("example.org", DEFAULT_ALLOWED_DOMAINS)
     assert not domain_allowed("eviltcs.com", DEFAULT_ALLOWED_DOMAINS)
+
+
+def test_visible_text_json_ignores_keys_and_algolia_highlight_metadata():
+    """Real HN Algolia hits echo the query terms in ``_highlightResult.matchedWords``; those
+    must not make an unrelated hit look TCS-relevant."""
+    raw = news_fixture("hn_search_highlight.json")
+    import json
+
+    first = json.dumps(json.loads(raw)["hits"][0])
+    assert is_tcs_relevant(first)  # the raw JSON string alone is fooled by matchedWords ["tcs"]
+    assert not is_tcs_relevant(visible_text(first, "application/json"))
+    second = json.dumps(json.loads(raw)["hits"][1])
+    assert is_tcs_relevant(visible_text(second, "application/json"))
+    assert visible_text("not json {", "application/json") == "not json {"
+
+
+def test_is_tcs_relevant_rejects_other_tcs_meanings():
+    assert not is_tcs_relevant("Ideas such as Taking Children Seriously (TCS) and unschooling")
+    assert not is_tcs_relevant("Unconditional Parenting and TCS are discussed in the thread")
+    assert is_tcs_relevant("TCS reported a data breach; the T&Cs were updated later.")
