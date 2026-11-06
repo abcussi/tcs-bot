@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     # Seed
     seed_file: str = "data/seed/vendors.json"
 
+    # TCS risk medallion pipeline (spec 005)
+    qdrant_url: str = "http://127.0.0.1:6333"
+    medallion_max_docs: int = Field(default=500, ge=1, le=500)
+    medallion_max_depth: int = Field(default=2, ge=0, le=2)
+    medallion_relevance_threshold: float = 0.35
+    silver_index: str = "silver-tcs-risk"
+    gold_dir: str = "data/gold"
+    gold_graph_k: int = 8
+    gold_graph_min_cosine: float = 0.30
+    lsa_dim: int = 256
+
     @field_validator("openai_embedding_model")
     @classmethod
     def _embedding_model_is_1536d(cls, v: str) -> str:
