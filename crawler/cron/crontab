@@ -1,0 +1,3 @@
+# supercronic crontab — keep in sync with CRAWLER_CRON (.env.example) — AC-002.5
+# m    h  dom mon dow  command
+*/15   *  *   *   *    gfinance-crawl --once
