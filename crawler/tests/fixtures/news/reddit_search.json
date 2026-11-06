@@ -1,0 +1,32 @@
+{
+  "_comment": "SYNTHETIC FIXTURE: invented Reddit search listing; not real posts.",
+  "kind": "Listing",
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "syn001",
+          "subreddit": "developersIndia",
+          "title": "SYNTHETIC: TCS appraisal cycle and bench policy thread",
+          "selftext": "SYNTHETIC FIXTURE post about working at TCS.",
+          "permalink": "/r/developersIndia/comments/syn001/synthetic_tcs_appraisal/",
+          "url": "https://www.reddit.com/r/developersIndia/comments/syn001/synthetic_tcs_appraisal/",
+          "created_utc": 1793500000.0
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "syn002",
+          "subreddit": "india",
+          "title": "SYNTHETIC: How is TCS on LRS remittance refunded in ITR?",
+          "selftext": "SYNTHETIC FIXTURE post about tax collected at source on foreign remittance.",
+          "permalink": "/r/india/comments/syn002/synthetic_tcs_lrs/",
+          "url": "https://www.reddit.com/r/india/comments/syn002/synthetic_tcs_lrs/",
+          "created_utc": 1793400000.0
+        }
+      }
+    ]
+  }
+}

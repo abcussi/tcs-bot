@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC FIXTURE: invented Google News RSS feed for offline tests; not real news. -->
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+<title>"TCS lawsuit" - Google News</title>
+<link>https://news.google.com/search?q=TCS+lawsuit&amp;hl=en-IN&amp;gl=IN&amp;ceid=IN:en</link>
+<description>Google News</description>
+<item>
+<title>SYNTHETIC: TCS faces fictional contract lawsuit in test court - Example Times</title>
+<link>https://news.google.com/rss/articles/CBMiSYNTHETIC001?oc=5</link>
+<guid isPermaLink="false">CBMiSYNTHETIC001</guid>
+<pubDate>Mon, 02 Nov 2026 08:30:00 GMT</pubDate>
+<description>&lt;a href="https://news.google.com/rss/articles/CBMiSYNTHETIC001?oc=5"&gt;SYNTHETIC: TCS faces fictional contract lawsuit&lt;/a&gt;</description>
+<source url="https://economictimes.indiatimes.com">The Economic Times</source>
+</item>
+<item>
+<title>SYNTHETIC: New TCS rules on foreign remittance under LRS explained - Example Money</title>
+<link>https://news.google.com/rss/articles/CBMiSYNTHETIC002?oc=5</link>
+<guid isPermaLink="false">CBMiSYNTHETIC002</guid>
+<pubDate>Sun, 01 Nov 2026 10:00:00 GMT</pubDate>
+<description>Tax Collected at Source (TCS) on remittances above the LRS threshold.</description>
+<source url="https://www.financialexpress.com">Financial Express</source>
+</item>
+<item>
+<title>SYNTHETIC: Tata Consultancy Services whistleblower claims reviewed - Example Mint</title>
+<link>https://news.google.com/rss/articles/CBMiSYNTHETIC003?oc=5</link>
+<guid isPermaLink="false">CBMiSYNTHETIC003</guid>
+<pubDate>Sat, 31 Oct 2026 12:00:00 GMT</pubDate>
+<description>Fictional whistleblower story used in tests.</description>
+<source url="https://www.livemint.com">Mint</source>
+</item>
+</channel>
+</rss>

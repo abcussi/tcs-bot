@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC FIXTURE: invented Bing News RSS feed for offline tests; not real news. -->
+<rss version="2.0" xmlns:News="https://www.bing.com:443/news/search?q=TCS&amp;format=rss">
+<channel>
+<title>TCS lawsuit - BingNews</title>
+<link>https://www.bing.com/news/search?q=TCS+lawsuit&amp;format=rss</link>
+<item>
+<title>SYNTHETIC: TCS lawsuit over fictional software licence</title>
+<link>http://www.bing.com/news/apiclick.aspx?ref=FexRss&amp;aid=&amp;tid=SYNTH1&amp;url=https%3a%2f%2feconomictimes.indiatimes.com%2ftech%2ftcs-synthetic-lawsuit%2farticleshow%2f1001.cms%3futm_source%3dbing&amp;c=1&amp;mkt=en-in</link>
+<description>SYNTHETIC FIXTURE snippet: Tata Consultancy Services named in a fictional suit.</description>
+<pubDate>Mon, 02 Nov 2026 09:00:00 GMT</pubDate>
+<News:Source>Example Times</News:Source>
+</item>
+<item>
+<title>SYNTHETIC: TCS layoffs rumours denied in test bulletin</title>
+<link>http://www.bing.com/news/apiclick.aspx?ref=FexRss&amp;aid=&amp;tid=SYNTH2&amp;url=https%3a%2f%2fwww.livemint.com%2fcompanies%2ftcs-synthetic-whistleblower-11.html&amp;c=2&amp;mkt=en-in</link>
+<description>SYNTHETIC FIXTURE snippet about TCS staffing.</description>
+<pubDate>Sun, 01 Nov 2026 07:00:00 GMT</pubDate>
+<News:Source>Example Mint</News:Source>
+</item>
+</channel>
+</rss>

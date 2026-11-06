@@ -1,0 +1,35 @@
+{
+  "_comment": "SYNTHETIC FIXTURE: invented GDELT DOC API artlist response; not real news.",
+  "articles": [
+    {
+      "url": "https://www.reuters.com/technology/tcs-synthetic-data-breach-2026-11-01/",
+      "url_mobile": "",
+      "title": "SYNTHETIC: TCS probes fictional data breach at test client",
+      "seendate": "20261101T061500Z",
+      "socialimage": "",
+      "domain": "reuters.com",
+      "language": "English",
+      "sourcecountry": "United States"
+    },
+    {
+      "url": "https://economictimes.indiatimes.com/tech/tcs-synthetic-lawsuit/articleshow/1001.cms",
+      "url_mobile": "",
+      "title": "SYNTHETIC: TCS lawsuit over fictional software licence",
+      "seendate": "20261102T090000Z",
+      "socialimage": "",
+      "domain": "economictimes.indiatimes.com",
+      "language": "English",
+      "sourcecountry": "India"
+    },
+    {
+      "url": "https://www.financialexpress.com/money/tcs-on-lrs-synthetic/",
+      "url_mobile": "",
+      "title": "SYNTHETIC: Tax collected at source on LRS remittances - what changes",
+      "seendate": "20261031T050000Z",
+      "socialimage": "",
+      "domain": "financialexpress.com",
+      "language": "English",
+      "sourcecountry": "India"
+    }
+  ]
+}

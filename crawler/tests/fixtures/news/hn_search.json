@@ -1,0 +1,25 @@
+{
+  "_comment": "SYNTHETIC FIXTURE: invented HN Algolia search response; not real posts.",
+  "hits": [
+    {
+      "objectID": "90000001",
+      "title": "SYNTHETIC: TCS data breach discussion",
+      "url": "https://www.reuters.com/technology/tcs-synthetic-data-breach-2026-11-01/",
+      "author": "synthetic_user",
+      "points": 42,
+      "story_id": 90000001,
+      "created_at": "2026-11-01T07:00:00.000Z",
+      "created_at_i": 1793516400,
+      "_tags": ["story", "author_synthetic_user", "story_90000001"]
+    },
+    {
+      "objectID": "90000005",
+      "comment_text": "SYNTHETIC comment: I worked at TCS and the on-call rota was rough.",
+      "story_id": 90000001,
+      "story_title": "SYNTHETIC: TCS data breach discussion",
+      "author": "synthetic_commenter",
+      "created_at": "2026-11-01T08:00:00.000Z",
+      "_tags": ["comment", "story_90000001"]
+    }
+  ]
+}
