@@ -67,8 +67,8 @@ class Settings(BaseSettings):
     medallion_relevance_threshold: float = 0.35
     silver_index: str = "silver-tcs-risk"
     gold_dir: str = "data/gold"
-    gold_graph_k: int = 8
-    gold_graph_min_cosine: float = 0.30
+    gold_graph_k: int = 5  # a cap: gold scales the effective k to the corpus size
+    gold_graph_min_cosine: float = 0.35
     lsa_dim: int = 256
 
     @field_validator("openai_embedding_model")
