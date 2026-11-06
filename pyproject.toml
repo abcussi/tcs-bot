@@ -57,6 +57,7 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
   "integration: needs live MySQL / Redis / Elasticsearch (docker compose up)",
   "e2e: full HTTP flow through the running stack",
+  "openai: calls the real OpenAI API (needs OPENAI_API_KEY)",
 ]
 addopts = "-ra"
 
