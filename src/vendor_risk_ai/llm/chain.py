@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from vendor_risk_ai.config import Settings
 
 FAKE_MODEL = "fake-heuristic-v1"
+REPORT_MODEL_METADATA_KEY = "report_model"
 _MAX_CONTEXT_CHARS_PER_CHUNK = 1500
 
 ScoredChunks = list[tuple[ChunkRecord, float]]
@@ -153,46 +154,78 @@ def _with_finalize(generator: Runnable, model: str) -> Runnable[dict, RiskReport
     ).with_config(run_name="finalize_report")
 
 
-def build_report_chain(settings: Settings) -> Runnable[dict, RiskReport]:
-    """``format | ChatPromptTemplate | ChatOpenAI(...).with_structured_output(RiskReport)``.
-
-    Uses function calling (non-strict) because RiskReport has defaulted fields that OpenAI's
-    strict json_schema mode rejects. Returns the offline heuristic chain when
-    ``settings.use_fake_llm``.
-    """
-    if settings.use_fake_llm:
-        return build_fake_chain()
-    structured = build_llm(settings).with_structured_output(RiskReport, method="function_calling")
-    generator = (
+def _structured_generator(llm: ChatOpenAI) -> Runnable:
+    """``format | prompt | llm.with_structured_output(RiskReport)`` (function calling)."""
+    return (
         RunnableLambda(lambda x: format_inputs(x, STRUCTURED_OUTPUT_INSTRUCTIONS)).with_config(
             run_name="format_inputs"
         )
         | build_prompt()
-        | structured
-    )
-    return _with_finalize(generator, settings.openai_chat_model).with_config(
-        run_name="risk_report_chain"
+        | llm.with_structured_output(RiskReport, method="function_calling")
     )
 
 
-def build_report_chain_with_parser(settings: Settings) -> Runnable[dict, RiskReport]:
-    """Fallback: plain completion + ``PydanticOutputParser`` (for models without tool calling)."""
-    if settings.use_fake_llm:
-        return build_fake_chain()
+def _parser_generator(llm: ChatOpenAI) -> Runnable:
+    """``format | prompt | llm | PydanticOutputParser(RiskReport)`` (plain completion)."""
     from langchain_core.output_parsers import PydanticOutputParser
 
     parser = PydanticOutputParser(pydantic_object=RiskReport)
     instructions = parser.get_format_instructions()
-    generator = (
+    return (
         RunnableLambda(lambda x: format_inputs(x, instructions)).with_config(
             run_name="format_inputs"
         )
         | build_prompt()
-        | build_llm(settings)
+        | llm
         | parser
     )
-    return _with_finalize(generator, settings.openai_chat_model).with_config(
-        run_name="risk_report_chain_parser"
+
+
+def _tag_model(chain: Runnable[dict, RiskReport], run_name: str, model: str) -> Runnable:
+    return chain.with_config(run_name=run_name, metadata={REPORT_MODEL_METADATA_KEY: model})
+
+
+def report_model_id(chain: Runnable, settings: Settings) -> str:
+    """Model id the chain stamps on its reports (``RiskReport.model``), used in cache keys.
+
+    Read from the chain's metadata (set by the builders here); falls back to the settings for
+    injected chains without it.
+    """
+    config = getattr(chain, "config", None) or {}
+    model = (config.get("metadata") or {}).get(REPORT_MODEL_METADATA_KEY)
+    if isinstance(model, str) and model:
+        return model
+    return FAKE_MODEL if settings.use_fake_llm else settings.openai_chat_model
+
+
+def build_report_chain(settings: Settings) -> Runnable[dict, RiskReport]:
+    """``format | ChatPromptTemplate | ChatOpenAI(...).with_structured_output(RiskReport)``.
+
+    Uses function calling (non-strict) because RiskReport has defaulted fields that OpenAI's
+    strict json_schema mode rejects. If the structured call fails (no tool call, invalid tool
+    arguments, ...), ``.with_fallbacks`` retries with the ``PydanticOutputParser`` path on the
+    same ``ChatOpenAI`` instance (AC-003.5). Returns the offline heuristic chain when
+    ``settings.use_fake_llm``.
+    """
+    if settings.use_fake_llm:
+        return build_fake_chain()
+    llm = build_llm(settings)
+    generator = _structured_generator(llm).with_fallbacks([_parser_generator(llm)])
+    return _tag_model(
+        _with_finalize(generator, settings.openai_chat_model),
+        "risk_report_chain",
+        settings.openai_chat_model,
+    )
+
+
+def build_report_chain_with_parser(settings: Settings) -> Runnable[dict, RiskReport]:
+    """Parser-only chain: plain completion + ``PydanticOutputParser`` (models without tools)."""
+    if settings.use_fake_llm:
+        return build_fake_chain()
+    return _tag_model(
+        _with_finalize(_parser_generator(build_llm(settings)), settings.openai_chat_model),
+        "risk_report_chain_parser",
+        settings.openai_chat_model,
     )
 
 
@@ -588,6 +621,10 @@ def heuristic_report(inputs: Mapping[str, Any]) -> RiskReport:
 
 
 def build_fake_chain() -> Runnable[dict, RiskReport]:
-    return _with_finalize(
-        RunnableLambda(heuristic_report).with_config(run_name="heuristic_analyzer"), FAKE_MODEL
-    ).with_config(run_name="risk_report_chain_fake")
+    return _tag_model(
+        _with_finalize(
+            RunnableLambda(heuristic_report).with_config(run_name="heuristic_analyzer"), FAKE_MODEL
+        ),
+        "risk_report_chain_fake",
+        FAKE_MODEL,
+    )
