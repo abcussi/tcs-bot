@@ -47,6 +47,19 @@ def test_canonical_url_is_idempotent_and_tolerant():
     assert canonical_url("") == ""
 
 
+def test_bing_apiclick_canonical_ignores_per_request_ids():
+    """AC-005.2/.4: the same story seen in two runs must dedupe. Bing redirect links carry
+    per-request ids (tid, c, aid, mkt, ref); only the target url is a stable identity.
+    SYNTHETIC FIXTURE (example.com URLs)."""
+    run1 = "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=AAA111&url=https%3a%2f%2fnews.example.com%2fa%2f1&c=111&mkt=en-in"
+    run2 = "http://www.bing.com/news/apiclick.aspx?c=222&mkt=es-xl&ref=FexRss&tid=BBB222&aid=&url=https%3A%2F%2Fnews.example.com%2Fa%2F1"
+    other = "http://www.bing.com/news/apiclick.aspx?tid=AAA111&url=https%3a%2f%2fnews.example.com%2fa%2f2"
+    assert canonical_url(run1) == canonical_url(run2)
+    assert canonical_url(run1) != canonical_url(other)
+    assert canonical_url(run1) != canonical_url("https://news.example.com/a/1")  # snippet != page
+    assert canonical_url(canonical_url(run1)) == canonical_url(run1)
+
+
 def test_extract_links_resolves_dedupes_and_skips_non_http():
     """AC-005.3: (url, anchor) pairs, absolute, deduped on canonical URL."""
     html = news_fixture("article_lawsuit.html")
