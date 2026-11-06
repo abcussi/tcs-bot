@@ -1,5 +1,7 @@
 # TCS Bot — Vendor Risk AI
 
+[![CI](https://github.com/abcussi/tcs-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/abcussi/tcs-bot/actions/workflows/ci.yml)
+
 AI-based **vendor risk assessment report generator for capital markets**.
 Ingests vendor financial reports, news and regulatory filings (text/PDF), retrieves the relevant
 chunks with `text-embedding-3-small` + numpy cosine similarity, and runs an LCEL pipeline
@@ -66,7 +68,13 @@ uv run pytest tests/unit crawler/tests     # offline
 uv run pytest -m integration               # needs `tcs-bot up`
 uv run pytest -m e2e
 uv run ruff check .
+OPENAI_API_KEY=sk-... uv run pytest -m openai   # real-model smoke test
 ```
+
+### CI (`.github/workflows/ci.yml`)
+Every push/PR: ruff + unit tests with coverage -> integration + e2e against MySQL/Redis/Elasticsearch
+service containers -> Docker image builds. Add the repository secret `OPENAI_API_KEY`
+(Settings -> Secrets and variables -> Actions) to also run the real gpt-4.1-mini smoke test.
 
 ## Requirements
 - [uv](https://docs.astral.sh/uv/) and Python 3.13

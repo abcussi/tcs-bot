@@ -52,6 +52,7 @@ uv run tcs-bot all --no-infra      # same pipeline, infra already running
 uv run pytest tests/unit crawler/tests -m "not integration"   # fast, no infra
 uv run pytest -m integration              # needs `uv run tcs-bot up`
 uv run pytest -m e2e                      # full stack
+uv run pytest -m openai                   # real OpenAI smoke test (needs OPENAI_API_KEY)
 uv run ruff check . && uv run ruff format --check .
 docker compose --profile app up -d --build   # everything in containers (api+crawler are in the `app` profile; needs .env)
 ```
