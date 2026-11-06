@@ -1,6 +1,6 @@
-- [ ] mysql.py pool + transaction
-- [ ] schema.sql + migrate (compensating rollback)
-- [ ] seed.py + data/seed/vendors.json (synthetic) + built-in fallback
-- [ ] repositories.py
-- [ ] cache.py two-tier
-- [ ] search/elastic.py mappings + helpers
+- [x] mysql.py pool + transaction
+- [x] schema.sql + migrate (compensating rollback)
+- [x] seed.py + data/seed/vendors.json (synthetic) + built-in fallback
+- [x] repositories.py
+- [x] cache.py two-tier
+- [x] search/elastic.py mappings + helpers
