@@ -2,7 +2,9 @@
 
 Indices (names from settings): ``market-quotes`` (written by the gfinance crawler) and
 ``vendor-chunks`` (document chunks + dense embeddings). Read helpers degrade gracefully:
-``latest_quote`` and ``ping`` never raise; ``index_chunks`` returns 0 on transport errors.
+``latest_quote`` and ``ping`` never raise by default; ``index_chunks`` returns 0 on transport
+errors. ``latest_quote(..., raise_on_error=True)`` raises :class:`SearchUnavailable` instead, so
+callers can tell "ES down" from "no quote" (constitution §6).
 ``ensure_indices`` raises if ES is unreachable (the orchestrator needs to know).
 """
 
@@ -62,6 +64,11 @@ CHUNKS_MAPPING: dict[str, Any] = {
 }
 
 _INDEX_SETTINGS: dict[str, Any] = {"number_of_shards": 1, "number_of_replicas": 0}
+
+
+class SearchUnavailable(RuntimeError):
+    """Elasticsearch could not answer (transport/API error), as opposed to "no result"."""
+
 
 _es: Elasticsearch | None = None
 _es_lock = threading.Lock()
@@ -173,8 +180,13 @@ def _quote_query(ticker: str) -> dict[str, Any]:
     return {"bool": {"should": should, "minimum_should_match": 1}}
 
 
-def latest_quote(ticker: str) -> dict | None:
-    """Newest ``market-quotes`` document for ``ticker`` ("IBM:NYSE" or "IBM"); never raises."""
+def latest_quote(ticker: str, *, raise_on_error: bool = False) -> dict | None:
+    """Newest ``market-quotes`` document for ``ticker`` ("IBM:NYSE" or "IBM").
+
+    Returns ``None`` when there is no quote (or the index does not exist yet). On any other
+    ES failure it logs and returns ``None`` by default (never raises), or raises
+    :class:`SearchUnavailable` when ``raise_on_error=True``.
+    """
     if not ticker or not ticker.strip():
         return None
     try:
@@ -190,7 +202,14 @@ def latest_quote(ticker: str) -> dict | None:
         return None
     except Exception as exc:
         log.warning("es.latest_quote.failed", ticker=ticker, error=str(exc)[:200])
+        if raise_on_error:
+            raise SearchUnavailable(f"latest_quote failed: {type(exc).__name__}") from exc
         return None
+
+
+def latest_quote_strict(ticker: str) -> dict | None:
+    """``latest_quote`` that raises :class:`SearchUnavailable` when ES is down (service wiring)."""
+    return latest_quote(ticker, raise_on_error=True)
 
 
 def ping() -> bool:
