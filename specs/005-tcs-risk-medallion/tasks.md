@@ -40,6 +40,13 @@
   (GDELT has no item permalink). if reddit.com robots.txt disallows generic crawlers (it did as of
   2024), RedditSearch is reported as blocked in production; robots is respected, not bypassed.
 
+- Real-internet probe (2026-11-06, local PC, robots respected): Google News RSS (`/rss/search`
+  disallowed) and Reddit are blocked by robots.txt, so `default_sources` still lists them but every
+  run reports them as `blocked`. GDELT intermittently answers HTTP 429 (not retried; source disabled
+  for the run). Bing News RSS, Hacker News work. moneycontrol, business-standard, news18, firstpost
+  answer 403 to the bot UA; the depth-0 Bing snippet is kept. HN relevance is loose: a thread counts
+  if any comment mentions TCS.
+
 ## SILVER (`src/tcs_bot/medallion/silver/`, owner: agent SILVER)
 - [x] `extract.py` — `extract_main_text(raw, content_type, url) -> (text, title|None)`: HTML via
       trafilatura (favor_recall, no comments) + bs4 fallback (script/style/nav/footer/header/aside

@@ -58,6 +58,40 @@ docker compose --profile app up -d --build
 `uv run tcs-bot-mcp` (stdio) or `uv run tcs-bot-mcp --transport streamable-http --port 8001`.
 Tools: `generate_vendor_risk_report`, `list_vendors`.
 
+## TCS risk medallion pipeline (spec 005)
+Crawls news and communities about Tata Consultancy Services (TCS) and turns them into a risk view
+across ethics, compliance, legal, privacy/cyber, labour/HR, financial, operational, reputational,
+ESG and geopolitical/immigration. Limits: crawl depth <= 2, <= 500 documents per run.
+
+| Layer | Store | Code | Content |
+|---|---|---|---|
+| Bronze | MySQL `bronze_documents`, `crawl_runs` | `crawler/src/gfinance_crawler/news/`, `medallion/bronze.py` | Raw documents as fetched, with crawl lineage (query, parent URL, depth, run id) |
+| Silver | Elasticsearch `silver-tcs-risk` | `medallion/silver/` | Clean text, entities, sentiment, TCS relevance, risk signals by category, risk score 0-100 |
+| Gold | Qdrant `gold_tcs_risk_{docs,chunks}__<model>` + `data/gold/` | `medallion/gold/` | Embeddings, cosine k-NN graph, Louvain/KMeans clusters, interactive graph |
+
+```bash
+docker compose up -d mysql redis elasticsearch qdrant
+uv run tcs-bot migrate && uv run tcs-bot seed && uv run tcs-bot index
+uv run tcs-bot medallion run --max-docs 50 --max-depth 2   # bronze -> silver -> gold
+uv run tcs-bot medallion bronze|silver|gold                # one layer at a time
+uv run tcs-bot medallion schedule --cron "0 */6 * * *"     # recurring (Compose service `medallion`, profile `app`)
+```
+Offline input: drop `.html/.txt/.json/.pdf` files into `data/bronze/inbox/`.
+
+**View the graph:** open `data/gold/tcs_risk_graph.html` in a browser (self-contained, no network).
+The same data is served at `GET /tcs/risks/{search?q=&k=,summary,graph}` and by the MCP tool
+`search_tcs_risks`.
+
+**Embeddings:** OpenAI `text-embedding-3-small` when `OPENAI_API_KEY` is set and
+`LLM_PROVIDER=openai`; otherwise an offline TF-IDF+SVD ("LSA") embedder. Collection names include the
+model, so vector spaces never mix. Tune the graph with `GOLD_GRAPH_K` and `GOLD_GRAPH_MIN_COSINE`,
+and the relevance filter with `MEDALLION_RELEVANCE_THRESHOLD`.
+
+**Sources and politeness:** Bing News RSS, GDELT, Hacker News and the local inbox work. robots.txt is
+respected and never bypassed: Google News (`/rss/search`) and Reddit disallow generic crawlers, so
+those sources are reported as `blocked` on every run. HTTP 429 is not retried and also counts as
+blocked. Some publishers answer 403 to the bot user agent; their Bing RSS snippet is kept instead.
+
 ## Development (spec-driven)
 Specs live in `specs/` (constitution + one folder per feature with `spec.md`, `plan.md`, `tasks.md`).
 Shared AI context for all models: [`AGENTS.md`](AGENTS.md). Claude subagents: `.claude/agents/`
@@ -72,7 +106,7 @@ OPENAI_API_KEY=sk-... uv run pytest -m openai   # real-model smoke test
 ```
 
 ### CI (`.github/workflows/ci.yml`)
-Every push/PR: ruff + unit tests with coverage -> integration + e2e against MySQL/Redis/Elasticsearch
+Every push/PR: ruff + unit tests with coverage -> integration + e2e against MySQL/Redis/Elasticsearch/Qdrant
 service containers -> Docker image builds. Add the repository secret `OPENAI_API_KEY`
 (Settings -> Secrets and variables -> Actions) to also run the real gpt-4.1-mini smoke test.
 
