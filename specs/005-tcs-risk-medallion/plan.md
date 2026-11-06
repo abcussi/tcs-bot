@@ -42,11 +42,16 @@ silver/      extract.py  def extract_main_text(raw: str, content_type: str, url:
                          # helpers: is_relevant(relevance, word_count, title, threshold) -> bool;
                          #          attribute_risk(risk_score, relevance, threshold) -> float
              classify.py also: title_names_tcs(title) -> bool; length_damping(words) -> float
-gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts); get_gold_embedder(settings, corpus) -> Embedder-like
+gold/        embedder.py  class LsaEmbedder(dim=256).fit(texts)  # unigram TF-IDF + SVD rank min(dim, n-1, max(6, 0.3 n)); get_gold_embedder(settings, corpus) -> Embedder-like
              vector_store.py class GoldVectorStore(url, model): ensure(dim); upsert_docs/upsert_chunks; search(vector, k, filters) -> list[GoldHit]
-             analytics.py cosine_matrix(X); knn_graph(X, ids, k, threshold) -> nx.Graph; clusters(...); project_2d(X)
+             analytics.py cosine_matrix(X); knn_graph(X, ids, k, threshold) -> nx.Graph; kmeans_clusters(X, k_range=None, seed, min_size=2) -> (labels, info); louvain_communities(G, seed, resolution=1.0, min_size=2);
+                          cluster_summaries(X, labels, records, texts, S=None) -> list[ClusterSummary]; project_2d(X)
+                          suggest_k(n)=clamp(round(sqrt(n/2)),2,12); graph_params(n, k, min_cosine) -> (k_eff<=round(sqrt(n)), min_cosine)
+             dedupe.py    dedupe_records(records, text_of=None, S=None) -> DedupeResult(records, merged: {kept_doc_id: [dropped SilverRecord]})
+                          # gold-time only: same normalised title (+ text overlap) or near-identical text; richest doc kept, silver untouched
              viz.py       def render_html(graph_json: dict, path: Path) -> Path
-             pipeline.py  def run_gold() -> dict   # writes data/gold/*
+             pipeline.py  def run_gold() -> dict   # writes data/gold/*; dedupes, embeds embedding_text(r) (title x3 + summary + first 150 words), builds the graph
+                          build_graph_json(records, X, texts, settings, model, n_chunks, merged=None); nodes carry merged_doc_ids / also_seen_in / merged_sources
 ```
 ## Storage
 - MySQL `crawl_runs(id, started_at, finished_at, params JSON, stats JSON)`;

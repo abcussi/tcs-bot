@@ -1,6 +1,6 @@
 """Gold embedders (AC-005.7): OpenAI ``text-embedding-3-small`` or an offline LSA embedder.
 
-The LSA embedder is TF-IDF (uni+bi-grams) followed by a truncated SVD, fitted on the gold
+The LSA embedder is TF-IDF (unigrams) followed by a truncated SVD, fitted on the gold
 corpus. Vectors are L2-normalized and zero-padded to ``dim`` so the Qdrant collection dimension
 is stable whatever the corpus size.
 """
@@ -35,14 +35,24 @@ def _l2_normalize(m: np.ndarray) -> np.ndarray:
     return np.divide(m, norms, out=np.zeros_like(m), where=norms > 0)
 
 
+def target_components(n_docs: int) -> int:
+    """SVD rank that scales with the corpus (``max(6, 0.3 * n_docs)``).
+
+    With ``n_docs - 1`` components on a small corpus the projection is nearly the raw TF-IDF space
+    (pairwise cosines ~0.02, nothing clusters); a low rank keeps the shared topics.
+    """
+    return max(6, round(0.3 * n_docs))
+
+
 class LsaEmbedder:
     """Offline TF-IDF + TruncatedSVD ("latent semantic analysis") embedder.
 
     Fit once on the corpus, then ``embed`` any text (queries included) into the same space.
     Deterministic: ``random_state=42``. Small corpora degrade gracefully:
 
-    * ``n_components = min(dim, n_features - 1, n_docs - 1)``; when that is < 2 the raw TF-IDF
-      vector (vocabulary capped at ``dim``) is used instead of the SVD projection;
+    * ``n_components = min(dim, n_features - 1, n_docs - 1, target_components(n_docs))``; when
+      that is < 2 the raw TF-IDF vector (vocabulary capped at ``dim``) is used instead of the SVD
+      projection;
     * an empty vocabulary (e.g. only stop words) falls back to the offline hash embedder.
     """
 
@@ -66,10 +76,12 @@ class LsaEmbedder:
 
         return TfidfVectorizer(
             sublinear_tf=True,
-            ngram_range=(1, 2),
+            # unigrams: bigrams are almost all singletons on a small corpus and only add noise
+            ngram_range=(1, 1),
             stop_words="english",
-            # max_df=0.9 would empty the vocabulary of a 1-2 document corpus
-            max_df=0.9 if n_docs >= 3 else 1.0,
+            # words in over 60% of the documents carry no topic; (max_df < 1 would empty the
+            # vocabulary of a 1-2 document corpus)
+            max_df=0.6 if n_docs >= 5 else 1.0,
             min_df=1,
             max_features=max_features,
         )
@@ -91,7 +103,7 @@ class LsaEmbedder:
             self._hash = HashEmbedder(self.dim)
             return self
         n_features = tfidf.shape[1]
-        n_comp = min(self.dim, n_features - 1, n_docs - 1)
+        n_comp = min(self.dim, n_features - 1, n_docs - 1, target_components(n_docs))
         if n_comp >= 2:
             self._svd = TruncatedSVD(n_components=n_comp, random_state=42)
             self._svd.fit(tfidf)

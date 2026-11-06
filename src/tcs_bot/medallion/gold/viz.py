@@ -801,6 +801,10 @@ function renderSide() {
   var url = safeUrl(n.url);
   box.appendChild(el('div', { cls: 'dtitle' }, url ? el('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: n.title || url }) : (n.title || '')));
   box.appendChild(el('div', { cls: 'dmeta', text: joinParts([n.domain, n.source ? n.source + (n.source_type ? ' (' + n.source_type + ')' : '') : n.source_type, shortDate(n.published_at)]) }));
+  if (n.also_seen_in) {
+    var seen = (n.merged_sources || []).map(function (m) { return m.domain || m.source; }).filter(Boolean);
+    box.appendChild(el('div', { cls: 'dmeta', text: 'also seen in ' + n.also_seen_in + ' source' + (n.also_seen_in > 1 ? 's' : '') + (seen.length ? ': ' + seen.join(', ') : '') }));
+  }
   var chips = el('div', { cls: 'chips' });
   (n.risk_categories || []).forEach(function (c) {
     chips.appendChild(el('span', { cls: 'chip' }, el('span', { cls: 'sq', style: 'background:' + (palettes.category.map.get(c) || tokens.other) }), catLabel(c)));

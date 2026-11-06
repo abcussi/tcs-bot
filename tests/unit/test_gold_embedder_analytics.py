@@ -11,7 +11,12 @@ from sklearn.metrics import adjusted_rand_score
 
 from tcs_bot.config import Settings
 from tcs_bot.medallion.gold import analytics as A
-from tcs_bot.medallion.gold.embedder import LsaEmbedder, get_gold_embedder, model_slug
+from tcs_bot.medallion.gold.embedder import (
+    LsaEmbedder,
+    get_gold_embedder,
+    model_slug,
+    target_components,
+)
 from tcs_bot.medallion.gold.pipeline import doc_text
 from tcs_bot.medallion.models import SilverRecord
 
@@ -42,7 +47,8 @@ def test_lsa_is_deterministic_normalized_and_padded(texts: list[str]) -> None:
     assert Xa.dtype == np.float32 and Xa.shape == (30, 64)
     np.testing.assert_array_equal(Xa, Xb)
     np.testing.assert_allclose(np.linalg.norm(Xa, axis=1), 1.0, atol=1e-5)
-    assert a.n_components == 29  # min(dim, n_features - 1, n_docs - 1)
+    # rank scales with the corpus: min(dim, n_features - 1, n_docs - 1, target_components(n_docs))
+    assert a.n_components == target_components(30) == 9
     assert not Xa[:, a.n_components :].any()
     assert a.model == "lsa-64" and model_slug(a) == "lsa_64"
 
@@ -194,7 +200,9 @@ def test_cluster_summaries(X: np.ndarray, records: list[SilverRecord], texts: li
     assert sum(s.size for s in sums) == 30
     by_topic = {}
     for s in sums:
-        assert len(s.top_terms) >= 3 and s.label == " / ".join(s.top_terms[:3])
+        # label = "<dominant risk category>: <top terms>" (all 3 topics are category-pure)
+        assert len(s.top_terms) >= 3
+        assert s.label.endswith(" / ".join(s.top_terms[:2])) and ": " in s.label
         assert 0 < s.mean_intra_cosine <= 1 and 0 <= s.mean_risk_score <= 100
         assert len(s.representative_doc_ids) == 3
         rep_topics = {topic_of(r) for r in records if r.doc_id in s.representative_doc_ids}

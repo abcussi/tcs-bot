@@ -3,6 +3,7 @@ per-cluster summaries and dashboard statistics. Pure numpy / scikit-learn / netw
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from collections.abc import Hashable, Sequence
 from typing import Any
@@ -19,6 +20,63 @@ log = get_logger(__name__)
 DOMAIN_STOP_WORDS = frozenset(
     {"tcs", "tata", "consultancy", "services", "said", "says", "company", "ltd", "limited"}
 )
+# News / forum boilerplate and contraction fragments that float to the top of TF-IDF labels.
+# fmt: off
+BOILERPLATE_STOP_WORDS = frozenset((
+        "according", "added", "also", "announced", "april", "article", "articles", "ask", "august",
+        "best", "better", "big", "billion", "cent", "click", "com", "comment", "comments",
+        "continue", "copyright", "could", "crore", "december", "decided", "decides", "decision",
+        "did", "didn", "does", "doesn", "don", "edit", "expected", "february", "firm", "firms",
+        "first", "following", "friday", "get", "gets", "going", "good", "group", "hacker", "hn",
+        "http", "https", "image", "important", "inc", "including", "india", "indian", "isn",
+        "january", "july", "june", "just", "know", "known", "lakh", "largest", "like", "likely",
+        "link", "links", "made", "make", "makes", "many", "march", "may", "maybe", "means",
+        "million", "monday", "month", "months", "more", "most", "much", "need", "net", "news",
+        "newsletter", "november", "now", "number", "october", "often", "one", "only", "org",
+        "other", "others", "page", "pages", "part", "people", "per", "percent", "photo", "point",
+        "points", "post", "posted", "rapidly", "read", "really", "recent", "recently", "record",
+        "report", "reported", "reporter", "reports", "role", "rs", "said", "saturday", "say",
+        "says", "see", "seen", "september", "share", "shares", "since", "site", "slightly", "still",
+        "subscribe", "sunday", "sure", "take", "taken", "takes", "thing", "things", "think",
+        "though", "thousand", "three", "thursday", "time", "times", "today", "told", "took",
+        "track", "tuesday", "two", "used", "using", "video", "view", "want", "wasn", "way",
+        "wednesday", "week", "weeks", "well", "went", "were", "weren", "whether", "while",
+        "wikipedia", "won", "would", "www", "year", "years", "yet",
+))
+# fmt: on
+# Human-readable names used to prefix a cluster label with its dominant risk category.
+CATEGORY_NAMES = {
+    "ethics": "Ethics",
+    "compliance_regulatory": "Compliance",
+    "legal_litigation": "Legal",
+    "data_privacy_cyber": "Cyber/privacy",
+    "labor_hr": "Labour/HR",
+    "financial": "Financial",
+    "operational_delivery": "Operations",
+    "reputational": "Reputation",
+    "esg": "ESG",
+    "geopolitical_immigration": "Immigration",
+}
+CATEGORY_LABEL_MIN_SHARE = 0.5
+MIN_CLUSTER_SIZE = 2
+MAX_K = 12
+SILHOUETTE_TOLERANCE = 0.03
+
+
+def suggest_k(n: int) -> int:
+    """Number of clusters that scales with the corpus: ``clamp(round(sqrt(n / 2)), 2, 12)``."""
+    if n < 3:
+        return 1 if n else 0
+    return int(min(MAX_K, max(2, round((n / 2) ** 0.5))))
+
+
+def graph_params(n: int, k: int, min_cosine: float) -> tuple[int, float]:
+    """Effective ``(k, min_cosine)`` for a corpus of ``n`` documents.
+
+    ``k`` (the configured *maximum*) is capped at ``round(sqrt(n))`` (at least 2) so a 25-document
+    corpus gets a sparse, readable graph rather than a near-clique. The threshold is used as is.
+    """
+    return max(1, min(k, max(2, round(n**0.5)), max(n - 1, 1))), min_cosine
 
 
 # ---------------------------------------------------------------------- similarity
@@ -82,16 +140,57 @@ def knn_graph(
 
 
 # ---------------------------------------------------------------------- clustering
-def louvain_communities(G: nx.Graph, seed: int = 42) -> dict[Hashable, int]:
-    """Node -> community id (0 = largest community)."""
+def _renumber(comms: list[set]) -> dict[Hashable, int]:
+    comms = sorted((c for c in comms if c), key=lambda c: (-len(c), min(str(x) for x in c)))
+    return {node: cid for cid, comm in enumerate(comms) for node in comm}
+
+
+def merge_small_communities(
+    G: nx.Graph, comms: list[set], min_size: int = MIN_CLUSTER_SIZE
+) -> list[set]:
+    """Fold communities smaller than ``min_size`` into the neighbouring community they are
+    most strongly linked to (sum of edge weights). Nodes with no edge at all stay alone."""
+    comms = [set(c) for c in comms]
+    where = {n: i for i, c in enumerate(comms) for n in c}
+    for i in sorted(range(len(comms)), key=lambda i: len(comms[i])):
+        if not comms[i] or len(comms[i]) >= min_size:
+            continue
+        pull: Counter[int] = Counter()
+        for u in comms[i]:
+            for v, d in G[u].items():
+                if where[v] != i:
+                    pull[where[v]] += d.get("weight", 1.0)
+        if not pull:
+            continue
+        tgt = max(pull, key=lambda c: (pull[c], -c))
+        for u in comms[i]:
+            where[u] = tgt
+        comms[tgt] |= comms[i]
+        comms[i] = set()
+    return [c for c in comms if c]
+
+
+def louvain_communities(
+    G: nx.Graph, seed: int = 42, resolution: float = 1.0, min_size: int = MIN_CLUSTER_SIZE
+) -> dict[Hashable, int]:
+    """Node -> community id (0 = largest community).
+
+    ``resolution`` < 1 favours fewer, larger communities. Communities smaller than ``min_size``
+    are merged into their most strongly connected neighbour (isolated nodes stay singletons).
+    """
     if G.number_of_nodes() == 0:
         return {}
     if G.number_of_edges() == 0:
         comms: list[set] = [{n} for n in G.nodes]
     else:
-        comms = nx.community.louvain_communities(G, weight="weight", seed=seed)
-    comms = sorted(comms, key=lambda c: (-len(c), min(str(x) for x in c)))
-    return {node: cid for cid, comm in enumerate(comms) for node in comm}
+        comms = [
+            set(c)
+            for c in nx.community.louvain_communities(
+                G, weight="weight", seed=seed, resolution=resolution
+            )
+        ]
+        comms = merge_small_communities(G, comms, min_size)
+    return _renumber(comms)
 
 
 def _relabel_by_size(labels: np.ndarray) -> np.ndarray:
@@ -103,38 +202,85 @@ def _relabel_by_size(labels: np.ndarray) -> np.ndarray:
     return np.array([mapping[lab] for lab in labels.tolist()], dtype=int)
 
 
+def merge_small_clusters(
+    X: np.ndarray, labels: np.ndarray, min_size: int = MIN_CLUSTER_SIZE
+) -> np.ndarray:
+    """Reassign members of clusters smaller than ``min_size`` to the nearest (cosine of
+    centroids) cluster that is big enough. No-op when no cluster is big enough."""
+    labels = np.asarray(labels, dtype=int).copy()
+    counts = Counter(labels.tolist())
+    big = [c for c, m in counts.items() if m >= min_size]
+    small = [c for c, m in counts.items() if m < min_size]
+    if not big or not small:
+        return _relabel_by_size(labels)
+    Xn = l2_normalize(X)
+    cents = {c: l2_normalize(Xn[labels == c].mean(axis=0, keepdims=True))[0] for c in big}
+    for c in small:
+        for i in np.flatnonzero(labels == c):
+            labels[i] = max(big, key=lambda b: (float(Xn[i] @ cents[b]), -b))
+    return _relabel_by_size(labels)
+
+
 def kmeans_clusters(
-    X: np.ndarray, k_range: Sequence[int] | None = None, seed: int = 42
+    X: np.ndarray,
+    k_range: Sequence[int] | None = None,
+    seed: int = 42,
+    min_size: int = MIN_CLUSTER_SIZE,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """KMeans on L2-normalized vectors, ``k`` chosen by the best cosine silhouette.
 
-    Returns ``(labels, info)`` with ``info = {"k", "silhouette", "scores": {k: score}}``.
-    Labels are renumbered so cluster 0 is the largest. ``n < 3`` -> a single cluster.
+    Without ``k_range`` the candidates run from ``suggest_k(n) - 1`` to ``round(sqrt(n)) + 2``
+    (capped at 12), so ``k`` scales with the corpus. Silhouette alone keeps preferring more
+    clusters, so the *smallest* ``k`` within ``SILHOUETTE_TOLERANCE`` of the best score wins.
+    Clusters smaller than ``min_size`` are folded into the nearest cluster; the reported
+    silhouette is that of the final labels. Returns ``(labels, info)`` with
+    ``info = {"k", "silhouette", "scores": {k: score}, "k_target", "n_merged"}``. Labels are
+    renumbered so cluster 0 is the largest. ``n < 3`` -> a single cluster.
     """
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_score
 
     X = l2_normalize(np.asarray(X, dtype=np.float64))
     n = X.shape[0]
-    single = (np.zeros(n, dtype=int), {"k": 1 if n else 0, "silhouette": None, "scores": {}})
+    single = (
+        np.zeros(n, dtype=int),
+        {"k": 1 if n else 0, "silhouette": None, "scores": {}, "k_target": suggest_k(n)},
+    )
     if n < 3:
         return single
+    target = suggest_k(n)
+    if k_range is None:
+        k_range = range(max(2, target - 1), min(MAX_K, round(n**0.5) + 2) + 1)
     distinct = len({row.tobytes() for row in np.round(X, 10)})
-    ks = [k for k in (k_range or range(2, 13)) if 2 <= k <= min(n - 1, distinct)]
-    best: tuple[float, int, np.ndarray] | None = None
+    ks = [k for k in k_range if 2 <= k <= min(n - 1, distinct)]
+    cands: list[tuple[float, int, np.ndarray]] = []
     scores: dict[str, float] = {}
     for k in ks:
         labels = KMeans(n_clusters=k, random_state=seed, n_init=10).fit_predict(X)
         if len(set(labels.tolist())) < 2:
             continue
-        score = float(silhouette_score(X, labels, metric="cosine"))
+        merged = merge_small_clusters(X, labels, min_size)
+        if len(set(merged.tolist())) < 2:
+            continue
+        score = float(silhouette_score(X, merged, metric="cosine"))
         scores[str(k)] = round(score, 4)
-        if best is None or score > best[0] + 1e-9:
-            best = (score, k, labels)
-    if best is None:
+        cands.append((score, k, labels))
+    if not cands:
         return single
-    score, k, labels = best
-    return _relabel_by_size(labels), {"k": k, "silhouette": round(score, 4), "scores": scores}
+    top = max(c[0] for c in cands)
+    score, k, raw = min(
+        (c for c in cands if c[0] >= top - SILHOUETTE_TOLERANCE), key=lambda c: c[1]
+    )
+    labels = merge_small_clusters(X, raw, min_size)
+    info = {
+        "k": len(set(labels.tolist())),
+        "k_requested": k,
+        "silhouette": round(score, 4),
+        "scores": scores,
+        "k_target": target,
+        "n_merged": sum(m for m in Counter(raw.tolist()).values() if m < min_size),
+    }
+    return labels, info
 
 
 # ---------------------------------------------------------------------- graph metrics
@@ -182,47 +328,117 @@ def project_2d(X: np.ndarray) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------- summaries
-def _tfidf(texts: Sequence[str]) -> tuple[Any, np.ndarray]:
-    from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
+_URL = re.compile(r"https?://\S+|www\.\S+")
+_H1B = re.compile(r"\bh[- ]?1[- ]?b\b", re.I)
+_US = re.compile(r"\bu\.s\.?(?=\W|$)", re.I)
 
-    vec = TfidfVectorizer(
-        sublinear_tf=True,
+
+def _prep_text(text: str) -> str:
+    """Lower-case and glue tokens the default tokenizer would split (``H-1B``, ``U.S.``)."""
+    text = _URL.sub(" ", text or "")
+    text = _H1B.sub("h1b", text)
+    return _US.sub("us", text).lower()
+
+
+def _stem(term: str) -> str:
+    return " ".join(t[:-1] if len(t) > 3 and t.endswith("s") else t for t in term.split())
+
+
+def _term_matrix(texts: Sequence[str]) -> tuple[Any, np.ndarray]:
+    """Per-document term weights: sublinear tf, L1-normalised so long pages don't dominate."""
+    from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer
+
+    n = len(texts)
+    vec = CountVectorizer(
         ngram_range=(1, 2),
-        stop_words=list(ENGLISH_STOP_WORDS | DOMAIN_STOP_WORDS),
-        max_df=0.9 if len(texts) >= 3 else 1.0,
+        stop_words=list(ENGLISH_STOP_WORDS | DOMAIN_STOP_WORDS | BOILERPLATE_STOP_WORDS),
+        max_df=0.7 if n >= 5 else 1.0,
         min_df=1,
-        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z0-9]+\b",
+        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z0-9]{2,}\b",
+        preprocessor=_prep_text,
     )
     try:
-        M = vec.fit_transform(list(texts))
+        C = vec.fit_transform(list(texts)).astype(np.float64)
     except ValueError:  # empty vocabulary
         return None, np.array([])
-    return M, vec.get_feature_names_out()
+    C.data = 1.0 + np.log(C.data)
+    row_sum = np.asarray(C.sum(axis=1)).ravel()
+    row_sum[row_sum == 0] = 1.0
+    from scipy.sparse import diags
+
+    return diags(1.0 / row_sum) @ C, vec.get_feature_names_out()
+
+
+def _pick_terms(
+    names: np.ndarray, score: np.ndarray, picked: list[str], limit: int, *, unigrams_only: bool
+) -> None:
+    """Append the best-scoring terms to ``picked`` (in place) up to ``limit``, skipping a term
+    that overlaps one already picked (a unigram inside a bigram, ``visa`` / ``visas``)."""
+    stems = [set(_stem(t).split()) for t in picked]
+    for i in np.argsort(-score, kind="stable"):
+        if score[i] <= 0 or len(picked) >= limit:
+            return
+        term = str(names[i])
+        if term in picked or (unigrams_only and " " in term):
+            continue
+        toks = set(_stem(term).split())
+        if any(toks <= s or s <= toks for s in stems):
+            continue
+        picked.append(term)
+        stems.append(toks)
 
 
 def cluster_top_terms(texts: Sequence[str], labels: Sequence[int], n: int = 8) -> dict[int, list]:
-    """Distinctive TF-IDF terms per cluster (cluster mean minus half the global mean)."""
-    M, names = _tfidf(texts)
+    """Terms that best *discriminate* each cluster (class-based TF-IDF).
+
+    A term scores ``mean tf in the cluster * idf * share of its mass held by this cluster``. It
+    must occur in at least ``min(2, cluster size)`` documents of the cluster, which drops the
+    one-off bigrams a single long page produces; stop words cover news boilerplate.
+    """
+    M, names = _term_matrix(texts)
     labels_arr = np.asarray(labels)
+    cluster_ids = sorted(set(labels_arr.tolist()))
     if M is None or len(names) == 0:
-        return {int(c): [] for c in set(labels_arr.tolist())}
-    global_mean = np.asarray(M.mean(axis=0)).ravel()
+        return {int(c): [] for c in cluster_ids}
+    N = M.shape[0]
+    df = np.asarray((M > 0).sum(axis=0)).ravel()
+    idf = np.log((N + 1.0) / (df + 1.0)) + 1.0
+    means = {
+        c: np.asarray(M[np.flatnonzero(labels_arr == c)].mean(axis=0)).ravel() for c in cluster_ids
+    }
+    total = np.sum(list(means.values()), axis=0)
     out: dict[int, list[str]] = {}
-    for c in sorted(set(labels_arr.tolist())):
+    for c in cluster_ids:
         rows = np.flatnonzero(labels_arr == c)
-        mean = np.asarray(M[rows].mean(axis=0)).ravel()
-        score = mean - 0.5 * global_mean if len(set(labels_arr.tolist())) > 1 else mean
+        support = np.asarray((M[rows] > 0).sum(axis=0)).ravel()
+        share = np.divide(means[c], total, out=np.ones_like(total), where=total > 0)
+        score = means[c] * idf * share
+        strict = score.copy()
+        strict[support < min(2, len(rows))] = 0.0
         picked: list[str] = []
-        for i in np.argsort(-score):
-            if mean[i] <= 0 or len(picked) >= n:
-                break
-            term = str(names[i])
-            # skip a unigram already covered by a picked bigram and vice versa
-            if any(term in p.split() or p in term.split() for p in picked):
-                continue
-            picked.append(term)
+        _pick_terms(names, strict, picked, n, unigrams_only=False)
+        if len(picked) < min(3, n):  # sparse cluster: top up with single-document unigrams
+            _pick_terms(names, score, picked, min(3, n), unigrams_only=True)
         out[int(c)] = picked
     return out
+
+
+def dominant_category(r: SilverRecord) -> str | None:
+    """Risk category carrying the most severity weight in the record's signals."""
+    if not r.risk_signals:
+        return r.risk_categories[0] if r.risk_categories else None
+    weight = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+    score: dict[str, int] = {}
+    for s in r.risk_signals:
+        score[s.category] = score.get(s.category, 0) + weight[s.severity]
+    return max(score, key=lambda c: (score[c], -list(score).index(c)))
+
+
+def cluster_label(top_terms: Sequence[str], category: str | None, n_terms: int = 3) -> str:
+    """``"Legal: trade secrets / jury"`` when a risk category dominates, else top terms."""
+    if category and top_terms:
+        return f"{CATEGORY_NAMES.get(category, category)}: " + " / ".join(top_terms[:2])
+    return " / ".join(top_terms[:n_terms])
 
 
 def cluster_summaries(
@@ -246,6 +462,14 @@ def cluster_summaries(
         rows = np.flatnonzero(labels_arr == c)
         size = len(rows)
         cats: Counter[str] = Counter(cat for i in rows for cat in records[i].risk_categories)
+        dom: Counter[str] = Counter(
+            d for i in rows if (d := dominant_category(records[i])) is not None
+        )
+        top_cat = None
+        if dom:
+            cat, count = dom.most_common(1)[0]
+            if count / size >= CATEGORY_LABEL_MIN_SHARE and (size > 1 or len(dom) == 1):
+                top_cat = cat
         if size > 1:
             sub = S[np.ix_(rows, rows)]
             intra = float((sub.sum() - np.trace(sub)) / (size * (size - 1)))
@@ -259,7 +483,7 @@ def cluster_summaries(
             ClusterSummary(
                 cluster=int(c),
                 size=size,
-                label=" / ".join(top[:3]) or f"cluster {c}",
+                label=cluster_label(top, top_cat) or f"cluster {c}",
                 top_terms=top,
                 dominant_categories=dict(cats.most_common()),
                 mean_risk_score=round(float(np.mean([records[i].risk_score for i in rows])), 2),

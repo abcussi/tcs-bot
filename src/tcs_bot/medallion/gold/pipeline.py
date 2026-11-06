@@ -18,6 +18,7 @@ import numpy as np
 from tcs_bot.ingestion.chunker import chunk_text
 from tcs_bot.logging_setup import get_logger
 from tcs_bot.medallion.gold import analytics as A
+from tcs_bot.medallion.gold.dedupe import dedupe_records
 from tcs_bot.medallion.gold.embedder import LsaEmbedder, get_gold_embedder, model_slug
 from tcs_bot.medallion.gold.vector_store import ChunkRef, GoldVectorStore
 from tcs_bot.medallion.gold.viz import render_html
@@ -38,6 +39,8 @@ GRAPH_HTML = "tcs_risk_graph.html"
 LSA_PKL = "lsa.pkl"
 MAX_CHUNKS_PER_DOC = 50
 N_NEIGHBORS_IN_JSON = 8
+EMBED_LEAD_WORDS = 150
+EMBED_TITLE_WEIGHT = 3
 DATA_SOURCE_NOTE = (
     "Public news & community posts about TCS crawled by the medallion pipeline "
     "(bronze MySQL -> silver Elasticsearch -> gold Qdrant). Risk labels are automated."
@@ -60,6 +63,19 @@ def doc_text(r: SilverRecord) -> str:
     return "\n\n".join(seen)
 
 
+def embedding_text(r: SilverRecord, max_words: int = EMBED_LEAD_WORDS) -> str:
+    """Text the *document* vector (clustering / graph / labels) is built from.
+
+    Title (repeated: it is the most topical line), summary and the first ``max_words`` words of
+    the body. A whole Hacker News thread or news page drifts off-topic (comments, related links);
+    embedding all of it made unrelated long pages look alike and related short snippets look
+    different. Chunks (``build_chunks``) still cover the full text for retrieval.
+    """
+    lead = " ".join((r.clean_text or "").split()[:max_words])
+    parts = [r.title.strip()] * EMBED_TITLE_WEIGHT + [(r.summary or "").strip(), lead]
+    return "\n".join(p for p in parts if p)
+
+
 def build_chunks(records: Iterable[SilverRecord], settings: Settings) -> list[ChunkRef]:
     out: list[ChunkRef] = []
     for r in records:
@@ -68,14 +84,7 @@ def build_chunks(records: Iterable[SilverRecord], settings: Settings) -> list[Ch
     return out
 
 
-def _dominant_category(r: SilverRecord) -> str | None:
-    if not r.risk_signals:
-        return r.risk_categories[0] if r.risk_categories else None
-    weight = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-    score: dict[str, int] = {}
-    for s in r.risk_signals:
-        score[s.category] = score.get(s.category, 0) + weight[s.severity]
-    return max(score, key=lambda c: (score[c], -list(score).index(c)))
+_dominant_category = A.dominant_category
 
 
 def build_graph_json(
@@ -85,11 +94,20 @@ def build_graph_json(
     settings: Settings,
     embedding_model: str,
     n_chunks: int,
+    merged: dict[int, list[SilverRecord]] | None = None,
 ) -> tuple[dict[str, Any], nx.Graph]:
-    """All gold analytics -> the JSON document behind graph.json / summary.json / the HTML."""
+    """All gold analytics -> the JSON document behind graph.json / summary.json / the HTML.
+
+    ``merged`` maps a kept doc id to the near-duplicate documents folded into it (see
+    ``dedupe``); they are reported on the node as ``merged_doc_ids`` / ``also_seen_in``.
+    """
+    merged = merged or {}
     ids = [r.doc_id for r in records]
     S = A.cosine_matrix(X)
-    G = A.knn_graph(X, ids, settings.gold_graph_k, settings.gold_graph_min_cosine, S=S)
+    k_eff, cos_eff = A.graph_params(
+        len(records), settings.gold_graph_k, settings.gold_graph_min_cosine
+    )
+    G = A.knn_graph(X, ids, k_eff, cos_eff, S=S)
     communities = A.louvain_communities(G)
     labels, kinfo = A.kmeans_clusters(X)
     cent = A.centrality(G)
@@ -121,6 +139,12 @@ def build_graph_json(
                 "y": round(float(xy[i, 1]), 5),
                 **{k: round(v, 5) for k, v in cent.get(r.doc_id, {}).items()},
                 "summary": (r.summary or r.clean_text)[:400],
+                "merged_doc_ids": [m.doc_id for m in merged.get(r.doc_id, [])],
+                "also_seen_in": len(merged.get(r.doc_id, [])),
+                "merged_sources": [
+                    {"doc_id": m.doc_id, "source": m.source, "domain": m.domain, "url": m.url}
+                    for m in merged.get(r.doc_id, [])
+                ],
                 "signals": [
                     {
                         "category": s.category,
@@ -147,12 +171,15 @@ def build_graph_json(
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "embedding_model": embedding_model,
         "n_docs": len(records),
+        "n_duplicates_merged": sum(len(v) for v in merged.values()),
         "n_chunks": n_chunks,
         "n_edges": G.number_of_edges(),
         "n_clusters": len(clusters),
         "n_communities": len(set(communities.values())),
-        "graph_k": settings.gold_graph_k,
-        "graph_min_cosine": settings.gold_graph_min_cosine,
+        "graph_k": k_eff,
+        "graph_min_cosine": cos_eff,
+        "graph_k_configured": settings.gold_graph_k,
+        "n_isolated": sum(1 for _, d in G.degree() if d == 0),
         "kmeans": kinfo,
         "data_source": DATA_SOURCE_NOTE
         + (" SYNTHETIC TEST DATA - not real events." if synthetic else ""),
@@ -239,8 +266,12 @@ def run_gold(
     unique: dict[int, SilverRecord] = {}
     for rec in store.iter_relevant():
         unique[rec.doc_id] = rec
-    records = [unique[k] for k in sorted(unique)]
-    texts = [doc_text(r) for r in records]
+    all_records = [unique[k] for k in sorted(unique)]
+    dd = dedupe_records(all_records, doc_text)
+    records = dd.records
+    if dd.n_removed:
+        log.info("gold.dedupe", kept=len(records), merged=dd.n_removed)
+    texts = [embedding_text(r) for r in records]
     chunks = build_chunks(records, settings)
 
     if embedder is None:
@@ -249,7 +280,9 @@ def run_gold(
     X = embedder.embed(texts)
     Xc = embedder.embed([f"{c.record.title}\n{c.text}" for c in chunks])
 
-    graph_json, G = build_graph_json(records, X, texts, settings, embedder.model, len(chunks))
+    graph_json, G = build_graph_json(
+        records, X, texts, settings, embedder.model, len(chunks), merged=dd.merged
+    )
 
     qdrant_status = "skipped: no documents"
     upserted = {"docs": 0, "chunks": 0}
@@ -283,6 +316,7 @@ def run_gold(
 
     result = {
         "docs": len(records),
+        "duplicates_merged": dd.n_removed,
         "chunks": len(chunks),
         "edges": graph_json["meta"]["n_edges"],
         "clusters": graph_json["meta"]["n_clusters"],
