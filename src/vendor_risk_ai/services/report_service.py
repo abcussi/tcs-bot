@@ -7,12 +7,12 @@ so unit tests run with in-memory fakes and ``build_default_service()`` wires the
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from langchain_core.runnables import Runnable
 
-from vendor_risk_ai.api.errors import (
+from vendor_risk_ai.errors import (
     AppError,
     DependencyUnavailable,
     NotFoundError,
@@ -56,6 +56,8 @@ class DocumentRepo(Protocol):
     def list_for_vendor(self, vendor_id: int) -> list[VendorDocument]: ...
     def save_chunks(self, document_id: int, chunks: list[ChunkRecord]) -> int: ...
     def chunks_for_vendor(self, vendor_id: int) -> list[ChunkRecord]: ...
+    # optional (light, no embeddings); the service falls back to chunks_for_vendor without it
+    def chunk_ids_for_vendor(self, vendor_id: int) -> list[tuple[int, int]]: ...
 
 
 class ReportRepo(Protocol):
@@ -73,14 +75,29 @@ QuoteLookup = Callable[[str], dict | None]
 ChunkIndexer = Callable[[int, list[ChunkRecord]], int]
 
 
-def chunk_fingerprint(chunks: list[ChunkRecord]) -> str:
-    ids = sorted(f"{c.document_id}:{c.chunk_index}" for c in chunks)
+ChunkRef = ChunkRecord | tuple[int, int]  # full record or (document_id, chunk_index)
+
+
+def _chunk_ref(c: ChunkRef) -> tuple[int | None, int]:
+    return (c.document_id, c.chunk_index) if isinstance(c, ChunkRecord) else (c[0], c[1])
+
+
+def chunk_fingerprint(chunks: Sequence[ChunkRef]) -> str:
+    """Order-independent hash of the vendor's chunk set (``ChunkRecord``s or id pairs)."""
+    ids = sorted(f"{d}:{i}" for d, i in map(_chunk_ref, chunks))
     return hashlib.sha1(f"{len(ids)}|{','.join(ids)}".encode()).hexdigest()[:16]
 
 
-def report_cache_key(vendor_id: int, chunks: list[ChunkRecord], focus_areas: list[str]) -> str:
+def report_cache_key(
+    vendor_id: int,
+    chunks: Sequence[ChunkRef],
+    focus_areas: list[str],
+    top_k: int,
+    model: str,
+) -> str:
+    """AC-003.8: vendor + doc fingerprint + normalized focus + effective top_k + model id."""
     focus = ",".join(sorted({f.strip().lower() for f in focus_areas if f.strip()}))
-    return f"report:{vendor_id}:{chunk_fingerprint(chunks)}:{focus}"
+    return f"report:{vendor_id}:{chunk_fingerprint(chunks)}:k{int(top_k)}:{model}:{focus}"
 
 
 def _keys_index(vendor_id: int) -> str:
@@ -196,14 +213,33 @@ class ReportService:
                 return out
             offset += _VENDOR_PAGE
 
-    def _chunk_and_store(
-        self,
-        vendor_id: int,
-        document_id: int,
-        doc_type: str | None,
-        title: str | None,
-        content: str,
-    ) -> tuple[int, bool]:
+    @property
+    def model_id(self) -> str:
+        """Id of the model that generates reports with the current chain (cache-key input)."""
+        from vendor_risk_ai.llm.chain import report_model_id
+
+        return report_model_id(self.chain, self.settings)
+
+    def _chunk_ids(self, vendor_id: int) -> list[tuple[int, int]]:
+        """``(document_id, chunk_index)`` pairs without loading texts/embeddings."""
+        light = getattr(self.documents, "chunk_ids_for_vendor", None)
+        if light is not None:
+            return self._db("chunk_ids_for_vendor", lambda: list(light(vendor_id)))
+        chunks = self._db("chunks_for_vendor", lambda: self.documents.chunks_for_vendor(vendor_id))
+        return [(int(c.document_id or 0), c.chunk_index) for c in chunks]
+
+    def _index(self, vendor_id: int, chunks: list[ChunkRecord]) -> bool:
+        """Mirror chunks into ES; True only if ES accepted at least one (constitution §6)."""
+        if self.chunk_indexer is None or not chunks:
+            return False
+        try:
+            return self.chunk_indexer(vendor_id, chunks) > 0
+        except Exception as exc:  # ES is optional (constitution §6)
+            log.warning("chunk_index_failed", vendor_id=vendor_id, error_type=type(exc).__name__)
+            return False
+
+    def _split(self, content: str) -> list[str]:
+        """Normalize + chunk; ``empty_document`` (422) when nothing is left (AC-003.2)."""
         pieces = chunk_text(
             normalize_text(content), self.settings.rag_chunk_size, self.settings.rag_chunk_overlap
         )
@@ -211,6 +247,18 @@ class ReportService:
             raise ValidationAppError(
                 "Document has no text after normalization", code="empty_document"
             )
+        return pieces
+
+    def _chunk_and_store(
+        self,
+        vendor_id: int,
+        document_id: int,
+        doc_type: str | None,
+        title: str | None,
+        content: str | list[str],
+    ) -> tuple[int, bool]:
+        """Embed + save (+ index) a document's chunks; ``content`` may be pre-split pieces."""
+        pieces = content if isinstance(content, list) else self._split(content)
         embeddings: list[list[float]] | None
         try:
             embeddings = self.embedder.embed(pieces).tolist()
@@ -230,16 +278,40 @@ class ReportService:
             for i, text in enumerate(pieces)
         ]
         self._db("save_chunks", lambda: self.documents.save_chunks(document_id, chunks))
-        indexed = False
-        if self.chunk_indexer is not None:
-            try:
-                self.chunk_indexer(vendor_id, chunks)
-                indexed = True
-            except Exception as exc:  # ES is optional (constitution §6)
-                log.warning(
-                    "chunk_index_failed", vendor_id=vendor_id, error_type=type(exc).__name__
-                )
-        return len(chunks), indexed
+        return len(chunks), self._index(vendor_id, chunks)
+
+    def _is_stale(self, chunk: ChunkRecord) -> bool:
+        """Missing, wrong-sized or other-model embedding (not comparable with the embedder)."""
+        return (
+            not chunk.embedding
+            or len(chunk.embedding) != self.embedder.dim
+            or chunk.embedding_model != self.embedder.model
+        )
+
+    def _reembed_document(self, vendor_id: int, chunks: list[ChunkRecord], force: bool) -> bool:
+        """Re-embed one document's stale (or all, if ``force``) chunks, persist and re-index.
+
+        ``chunks`` is the document's full chunk set: ``save_chunks`` replaces the set in one
+        transaction, so unchanged chunks are passed through as-is.
+        """
+        document_id = int(chunks[0].document_id or 0)
+        todo = [i for i, c in enumerate(chunks) if force or self._is_stale(c)]
+        if not todo:
+            return False
+        try:
+            vectors = self.embedder.embed([chunks[i].text for i in todo]).tolist()
+        except Exception as exc:
+            log.warning("reembed_failed", document_id=document_id, error_type=type(exc).__name__)
+            return False
+        updated = list(chunks)
+        for i, vec in zip(todo, vectors, strict=True):
+            updated[i] = chunks[i].model_copy(
+                update={"embedding": vec, "embedding_model": self.embedder.model}
+            )
+        self._db("save_chunks", lambda: self.documents.save_chunks(document_id, updated))
+        self._index(vendor_id, updated)
+        log.info("document_reembedded", document_id=document_id, chunks=len(todo))
+        return True
 
     # ------------------------------------------------------------------ public API
     def list_vendors(self, limit: int = 100, offset: int = 0) -> list[Vendor]:
@@ -250,57 +322,61 @@ class ReportService:
 
     def ingest_document(self, vendor_id: int, doc: DocumentCreate) -> DocumentOut:
         self._require_vendor(vendor_id)
+        # Validate BEFORE inserting: rejected content must not leave a document/audit row.
+        pieces = self._split(doc.content)
         document_id = self._db("add_document", lambda: self.documents.add(vendor_id, doc))
-        existing = [
-            c
-            for c in self._db(
-                "chunks_for_vendor", lambda: self.documents.chunks_for_vendor(vendor_id)
-            )
-            if c.document_id == document_id
-        ]
+        existing = [ref for ref in self._chunk_ids(vendor_id) if ref[0] == document_id]
         if existing:  # duplicate content (dedupe by sha256): already chunked
             log.info("document_duplicate", vendor_id=vendor_id, document_id=document_id)
             return DocumentOut(
                 id=document_id, vendor_id=vendor_id, chunks=len(existing), indexed=False
             )
-        n, indexed = self._chunk_and_store(
-            vendor_id, document_id, doc.doc_type, doc.title, doc.content
-        )
+        n, indexed = self._chunk_and_store(vendor_id, document_id, doc.doc_type, doc.title, pieces)
         self.invalidate_vendor_reports(vendor_id)
         log.info("document_ingested", vendor_id=vendor_id, document_id=document_id, chunks=n)
         return DocumentOut(id=document_id, vendor_id=vendor_id, chunks=n, indexed=indexed)
 
-    def embed_all_pending(self) -> int:
-        """Chunk + embed (+ index) every stored document that has no chunks yet.
+    def embed_all_pending(self, reembed: bool = False) -> int:
+        """Bring every stored document's chunks up to date with the current embedder.
+
+        - documents without chunks are chunked + embedded (+ indexed);
+        - documents whose chunks have a missing / other-model embedding (e.g. after a
+          fake <-> openai switch) are re-embedded, persisted and re-indexed;
+        - ``reembed=True`` forces re-embedding of every chunk.
 
         Returns the number of documents processed. Used by the orchestrator ``index`` step.
         """
         processed = 0
         for vendor in self._all_vendors():
             docs = self._db("list_documents", lambda v=vendor: self.documents.list_for_vendor(v.id))
-            chunked = {
-                c.document_id
-                for c in self._db(
-                    "chunks_for_vendor", lambda v=vendor: self.documents.chunks_for_vendor(v.id)
-                )
-            }
-            pending = [d for d in docs if d.id not in chunked]
-            for d in pending:
+            by_doc: dict[int, list[ChunkRecord]] = {}
+            for c in self._db(
+                "chunks_for_vendor", lambda v=vendor: self.documents.chunks_for_vendor(v.id)
+            ):
+                by_doc.setdefault(int(c.document_id or 0), []).append(c)
+            changed = 0
+            for d in docs:
+                if d.id in by_doc:
+                    changed += self._reembed_document(vendor.id, by_doc[d.id], force=reembed)
+                    continue
                 try:
                     self._chunk_and_store(vendor.id, d.id, d.doc_type, d.title, d.content)
                 except ValidationAppError as exc:
                     log.warning("document_skipped", document_id=d.id, reason=exc.message)
                     continue
-                processed += 1
-            if pending:
+                changed += 1
+            if changed:
                 self.invalidate_vendor_reports(vendor.id)
-        log.info("embed_all_pending_done", documents=processed)
+            processed += changed
+        log.info("embed_all_pending_done", documents=processed, reembed=reembed)
         return processed
 
     def generate_report(self, req: ReportRequest) -> RiskReport:
         vendor = self._resolve_vendor(req)
-        chunks = self._db("chunks_for_vendor", lambda: self.documents.chunks_for_vendor(vendor.id))
-        key = report_cache_key(vendor.id, chunks, req.focus_areas)
+        top_k = req.top_k or self.settings.rag_top_k
+        model = self.model_id
+        # Cheap key first (ids only): a cache hit never loads texts/embeddings.
+        key = report_cache_key(vendor.id, self._chunk_ids(vendor.id), req.focus_areas, top_k, model)
 
         if req.use_cache:
             cached = self._cache_get(key)
@@ -312,8 +388,11 @@ class ReportService:
                 except ValueError:
                     log.warning("report_cache_corrupt", key=key)
 
+        chunks = self._db("chunks_for_vendor", lambda: self.documents.chunks_for_vendor(vendor.id))
+        # Re-key from what is actually used (a document may have been added in between).
+        key = report_cache_key(vendor.id, chunks, req.focus_areas, top_k, model)
+
         data_gaps: list[str] = []
-        top_k = req.top_k or self.settings.rag_top_k
         retrieved: list[tuple[ChunkRecord, float]] = []
         if not chunks:
             data_gaps.append(
@@ -398,7 +477,7 @@ def build_default_service(settings: Settings | None = None) -> ReportService:
     )
     from vendor_risk_ai.llm.chain import build_report_chain
     from vendor_risk_ai.rag.embeddings import get_embedder
-    from vendor_risk_ai.search.elastic import index_chunks, latest_quote
+    from vendor_risk_ai.search.elastic import index_chunks, latest_quote_strict
 
     settings = settings or get_settings()
     return ReportService(
@@ -408,7 +487,8 @@ def build_default_service(settings: Settings | None = None) -> ReportService:
         cache=get_cache(),
         embedder=get_embedder(settings),
         chain=build_report_chain(settings),
-        quote_lookup=latest_quote,
+        # strict: ES down raises -> explicit data_gaps note, distinct from "no quote" (§6)
+        quote_lookup=latest_quote_strict,
         chunk_indexer=index_chunks,
         settings=settings,
     )
