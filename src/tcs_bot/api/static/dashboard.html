@@ -126,6 +126,31 @@ details ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
 @keyframes sp { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
 .foot { color: var(--muted); font-size: 12px; margin-top: 8px; }
+[hidden] { display: none !important; }
+nav.tabs { display: flex; gap: 4px; padding: 0 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+nav.tabs button {
+  border: 0; background: none; color: var(--muted); padding: 10px 14px; cursor: pointer;
+  border-bottom: 3px solid transparent; font-weight: 600;
+}
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+main.mcp { grid-template-columns: minmax(280px, 400px) 1fr; }
+.field { display: grid; gap: 4px; margin-bottom: 10px; }
+.field label { font-size: 12.5px; font-weight: 600; }
+.field label small { font-weight: 400; color: var(--muted); }
+.field input[type=text], .field input[type=number], .field select, .field textarea {
+  font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); width: 100%;
+}
+.field textarea { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; min-height: 90px; }
+.desc { color: var(--muted); font-size: 13px; margin: 0 0 12px; white-space: pre-line; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.btn.small { padding: 4px 9px; font-size: 12.5px; }
+pre.json {
+  margin: 0; padding: 12px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line);
+  font: 12.5px/1.5 ui-monospace, Consolas, monospace; overflow: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word;
+}
+.reshead .tag { text-transform: none; }
+.desc.flow { white-space: normal; }
+.reshead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -137,7 +162,11 @@ details ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
     <a class="link" href="/tcs/risks/overview">TCS risk overview</a>
   </div>
 </header>
-<main>
+<nav class="tabs" role="tablist" aria-label="Dashboard sections">
+  <button type="button" role="tab" id="tab-vendors" aria-selected="true" aria-controls="view-vendors">Vendor reports</button>
+  <button type="button" role="tab" id="tab-mcp" aria-selected="false" aria-controls="view-mcp">MCP console</button>
+</nav>
+<main id="view-vendors" role="tabpanel" aria-labelledby="tab-vendors">
   <aside>
     <div class="card">
       <h2>Portfolio</h2>
@@ -149,6 +178,24 @@ details ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
   </aside>
   <section class="detail" id="detail">
     <div class="card empty">Loading vendors&hellip;</div>
+  </section>
+</main>
+<main class="mcp" id="view-mcp" role="tabpanel" aria-labelledby="tab-mcp" hidden>
+  <aside>
+    <div class="card panel">
+      <h2>Call an MCP tool</h2>
+      <p class="desc flow">Each call is a real MCP round trip (<code>tools/list</code>, <code>tools/call</code>) against the
+        <code>vendor-risk</code> server, the same one Claude Desktop and other MCP clients use.</p>
+      <div class="presets" id="presets"></div>
+      <div class="field"><label for="mcpTool">Tool</label><select id="mcpTool"></select></div>
+      <p class="desc" id="mcpDesc"></p>
+      <div id="mcpForm"></div>
+      <div class="field"><label for="mcpArgs">Arguments <small>(JSON, sent as is)</small></label><textarea id="mcpArgs" spellcheck="false">{}</textarea></div>
+      <button class="btn primary full" id="mcpRun" type="button">Run tool</button>
+    </div>
+  </aside>
+  <section class="detail" id="mcpOut">
+    <div class="card empty">Pick a tool and press Run tool.</div>
   </section>
 </main>
 <script>
@@ -374,7 +421,151 @@ document.getElementById("genAll").addEventListener("click", async (ev) => {
   for (const v of state.vendors) { if (!state.reports.get(v.id)) await generate(v.id, false); }
   ev.target.disabled = false;
 });
+// ------------------------------------------------------------------ tabs
+function showTab(name) {
+  for (const t of ["vendors", "mcp"]) {
+    document.getElementById("view-" + t).hidden = t !== name;
+    document.getElementById("tab-" + t).setAttribute("aria-selected", String(t === name));
+  }
+  if (name === "mcp") loadMcpTools();
+  try { history.replaceState(null, "", name === "mcp" ? "#mcp" : "#"); } catch (_) { /* file:// or sandbox */ }
+}
+document.getElementById("tab-vendors").addEventListener("click", () => showTab("vendors"));
+document.getElementById("tab-mcp").addEventListener("click", () => showTab("mcp"));
+
+// ------------------------------------------------------------------ MCP console
+const mcp = { tools: [], loading: null };
+const PRESETS = [
+  ["Generate report · vendor 1", "generate_vendor_risk_report", { vendor_id: 1 }],
+  ["Generate report · vendor 3", "generate_vendor_risk_report", { vendor_id: 3 }],
+  ["List vendors", "list_vendors", { limit: 5 }],
+  ["TCS risk summary", "tcs_risk_summary", {}],
+  ["Search TCS · layoffs", "search_tcs_risks", { query: "layoffs and job cuts", k: 3 }],
+];
+
+function mcpTool() { return mcp.tools.find((t) => t.name === document.getElementById("mcpTool").value); }
+function argType(p) {
+  if (p.anyOf) return p.anyOf.find((x) => x.type && x.type !== "null") || {};
+  return p;
+}
+
+function buildMcpForm() {
+  const tool = mcpTool(), form = document.getElementById("mcpForm");
+  form.replaceChildren();
+  document.getElementById("mcpDesc").textContent = tool ? tool.description.split("\n\n")[0] : "";
+  if (!tool) return;
+  const props = tool.input_schema.properties || {}, required = tool.input_schema.required || [];
+  for (const [name, raw] of Object.entries(props)) {
+    const p = argType(raw), f = el("div", "field");
+    const lab = el("label"); lab.htmlFor = "arg_" + name;
+    lab.append(document.createTextNode(name + (required.includes(name) ? " *" : "")));
+    lab.append(el("small", null, " " + (p.type || "json") + (p.type === "array" ? " (comma separated)" : "")));
+    let input, kind = "json";
+    if (p.type === "boolean") {
+      input = el("select"); kind = "boolean";
+      for (const [v, t] of [["", "(default)"], ["true", "true"], ["false", "false"]]) { const o = el("option", null, t); o.value = v; input.append(o); }
+    } else if (p.type === "integer" || p.type === "number") {
+      input = el("input"); input.type = "number"; kind = p.type; if (raw.default !== undefined) input.placeholder = String(raw.default);
+    } else if (p.type === "array") {
+      input = el("input"); input.type = "text"; kind = "list"; input.placeholder = "e.g. cyber, liquidity";
+    } else if (p.type === "string") {
+      input = el("input"); input.type = "text"; kind = "string";
+    } else { input = el("textarea"); input.placeholder = "JSON"; }
+    input.id = "arg_" + name; input.dataset.arg = name; input.dataset.kind = kind;
+    input.addEventListener("input", syncMcpArgs); input.addEventListener("change", syncMcpArgs);
+    f.append(lab, input); form.append(f);
+  }
+  syncMcpArgs();
+}
+
+function collectMcpArgs() {
+  const args = {};
+  for (const i of document.querySelectorAll("#mcpForm [data-arg]")) {
+    const v = i.value.trim(); if (v === "") continue;
+    const k = i.dataset.kind;
+    args[i.dataset.arg] = k === "integer" ? parseInt(v, 10) : k === "number" ? parseFloat(v)
+      : k === "boolean" ? v === "true" : k === "list" ? v.split(",").map((s) => s.trim()).filter(Boolean)
+      : k === "json" ? JSON.parse(v) : v;
+  }
+  return args;
+}
+function syncMcpArgs() {
+  try { document.getElementById("mcpArgs").value = JSON.stringify(collectMcpArgs(), null, 2); } catch (_) { /* keep text */ }
+}
+function setMcpForm(args) {
+  for (const i of document.querySelectorAll("#mcpForm [data-arg]")) {
+    const v = args[i.dataset.arg];
+    i.value = v === undefined ? "" : Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v);
+  }
+  syncMcpArgs();
+}
+
+async function loadMcpTools() {
+  if (mcp.tools.length || mcp.loading) return mcp.loading;
+  mcp.loading = (async () => {
+    const sel = document.getElementById("mcpTool");
+    try {
+      mcp.tools = await api("/mcp-console/tools");
+    } catch (e) {
+      document.getElementById("mcpOut").replaceChildren(el("div", "card notice err", "Could not list MCP tools: " + e.message));
+      return;
+    } finally { mcp.loading = null; }
+    sel.replaceChildren(...mcp.tools.map((t) => { const o = el("option", null, t.name); o.value = t.name; return o; }));
+    const box = document.getElementById("presets"); box.replaceChildren();
+    for (const [label, tool, args] of PRESETS) {
+      if (!mcp.tools.some((t) => t.name === tool)) continue;
+      const b = el("button", "btn small", label); b.type = "button";
+      b.addEventListener("click", () => { sel.value = tool; buildMcpForm(); setMcpForm(args); runMcp(); });
+      box.append(b);
+    }
+    buildMcpForm();
+  })();
+  return mcp.loading;
+}
+
+function jsonCard(title, value, open) {
+  const p = panel();
+  const d = el("details"); if (open) d.open = true;
+  d.append(el("summary", null, title));
+  const pre = el("pre", "json", JSON.stringify(value, null, 2)); pre.style.marginTop = "8px";
+  d.append(pre); p.append(d); return p;
+}
+
+async function runMcp() {
+  const out = document.getElementById("mcpOut"), btn = document.getElementById("mcpRun");
+  const tool = document.getElementById("mcpTool").value;
+  let args;
+  try { args = JSON.parse(document.getElementById("mcpArgs").value || "{}"); }
+  catch (e) { out.replaceChildren(el("div", "card notice err", "Arguments are not valid JSON: " + e.message)); return; }
+  btn.disabled = true;
+  const wait = el("div", "card notice"); wait.append(el("span", "spin"), document.createTextNode("Calling " + tool + " over MCP… a report takes about 15 seconds."));
+  out.replaceChildren(wait);
+  try {
+    const res = await api("/mcp-console/call", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tool, arguments: args }) });
+    const frag = document.createDocumentFragment();
+    const head = panel(); const rh = el("div", "reshead");
+    rh.append(el("b", null, tool), el("span", "lvl " + (res.is_error ? "critical" : "low"), res.is_error ? "tool error" : "ok"), el("span", "tag", res.elapsed_ms + " ms"));
+    head.append(rh); frag.append(head);
+    const sc = res.structured_content;
+    if (res.is_error) {
+      frag.append(el("div", "card notice err", res.text || "The tool reported an error."));
+    } else if (tool === "generate_vendor_risk_report" && sc && sc.risk_level) {
+      frag.append(renderReport(null, sc));
+    } else {
+      const p = panel("Answer"); p.append(el("pre", "json", sc ? JSON.stringify(sc, null, 2) : res.text)); frag.append(p);
+    }
+    frag.append(jsonCard("MCP request (tools/call)", res.request, false));
+    if (sc) frag.append(jsonCard("MCP response: structuredContent", sc, false));
+    out.replaceChildren(frag);
+  } catch (e) {
+    out.replaceChildren(el("div", "card notice err", "MCP call failed: " + e.message));
+  } finally { btn.disabled = false; }
+}
+document.getElementById("mcpTool").addEventListener("change", buildMcpForm);
+document.getElementById("mcpRun").addEventListener("click", runMcp);
+
 init();
+if (location.hash === "#mcp") showTab("mcp");
 </script>
 </body>
 </html>

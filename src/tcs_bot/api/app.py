@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from tcs_bot.api.errors import register_error_handlers
+from tcs_bot.api.mcp_console import router as mcp_router
 from tcs_bot.api.routes import router
 from tcs_bot.api.tcs_routes import router as tcs_router
 from tcs_bot.logging_setup import get_logger
@@ -22,6 +23,7 @@ OPENAPI_TAGS = [
     {"name": "vendors", "description": "Third-party vendor master data"},
     {"name": "documents", "description": "Ingest vendor financial reports, news and filings"},
     {"name": "reports", "description": "AI-generated structured vendor risk reports"},
+    {"name": "mcp", "description": "Browser bridge: list and call the MCP server's tools"},
 ]
 
 
@@ -95,4 +97,5 @@ def create_app(
     register_error_handlers(app)
     app.include_router(router)
     app.include_router(tcs_router)
+    app.include_router(mcp_router)
     return app

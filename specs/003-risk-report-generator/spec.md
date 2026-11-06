@@ -24,3 +24,8 @@
   generates a report on demand through `POST /reports`, and shows the four report sections: overall risk
   score, red flags, financial health summary, compliance recommendations. All report text is rendered as
   text (never HTML).
+- AC-003.11 The dashboard has an "MCP console" tab. `GET /mcp-console/tools` lists the MCP server's tools
+  with their input schemas; `POST /mcp-console/call {tool, arguments}` performs a real in-memory MCP
+  `tools/call` and returns the request, `is_error`, text, `structured_content` and timing. A tool error is
+  a normal 200 response with `is_error: true`; an unknown tool is a 404 error envelope. A
+  `generate_vendor_risk_report` answer is rendered with the same four report sections.
