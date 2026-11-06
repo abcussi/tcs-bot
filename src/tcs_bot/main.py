@@ -120,6 +120,23 @@ def step_mcp() -> None:
     mcp_main([])
 
 
+def step_medallion(
+    layer: str, max_docs: int | None, max_depth: int | None, cron: str | None
+) -> int:
+    """TCS risk medallion pipeline (spec 005): bronze (MySQL) -> silver (ES) -> gold (Qdrant)."""
+    import json
+
+    from tcs_bot.medallion import pipeline
+
+    if layer == "schedule":
+        pipeline.schedule(cron or pipeline.DEFAULT_CRON, max_docs=max_docs, max_depth=max_depth)
+        return 0
+    layers = list(pipeline.LAYERS) if layer == "run" else [layer]
+    result = pipeline.run_layers(layers, max_docs=max_docs, max_depth=max_depth)
+    print(json.dumps(result, indent=2, default=str))
+    return 0
+
+
 STEPS: dict[str, Callable[[], None]] = {
     "up": step_up,
     "down": step_down,
@@ -141,14 +158,27 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("command", choices=["all", *STEPS], help="step to run")
+    parser.add_argument("command", choices=["all", "medallion", *STEPS], help="step to run")
+    parser.add_argument(
+        "layer",
+        nargs="?",
+        choices=["run", "bronze", "silver", "gold", "schedule"],
+        default="run",
+        help="with 'medallion': which layer(s) to run (default: run = bronze->silver->gold)",
+    )
     parser.add_argument(
         "--no-infra",
         action="store_true",
         help="with 'all': skip docker compose (services already running)",
     )
+    parser.add_argument("--max-docs", type=int, default=None, help="medallion: cap (<=500)")
+    parser.add_argument("--max-depth", type=int, default=None, help="medallion: crawl depth (<=2)")
+    parser.add_argument("--cron", default=None, help="medallion schedule: crontab expression")
     args = parser.parse_args(argv)
     configure_logging(get_settings().log_level)
+
+    if args.command == "medallion":
+        return step_medallion(args.layer, args.max_docs, args.max_depth, args.cron)
 
     steps = PIPELINE if args.command == "all" else [args.command]
     if args.command == "all" and args.no_infra:
