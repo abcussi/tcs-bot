@@ -1,7 +1,7 @@
 """Orchestrator: one entrypoint that boots and runs the whole system (spec 004).
 
     uv run vendor-risk-ai all        # infra up -> migrate -> seed -> index -> crawl -> API
-    uv run vendor-risk-ai <step>     # up | down | status | migrate | seed | index | crawl | api | mcp
+    uv run vendor-risk-ai <step>   # up|down|status|migrate|seed|index|crawl|api|mcp
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ INFRA_SERVICES = ["mysql", "redis", "elasticsearch"]
 # ---------------------------------------------------------------- infra
 def _compose(*args: str) -> subprocess.CompletedProcess[str]:
     if not shutil.which("docker"):
-        raise SystemExit("docker CLI not found — install Docker (see README) or run services yourself")
+        raise SystemExit("docker CLI not found — install Docker (see README)")
     cmd = ["docker", "compose", *args]
     log.info("exec", cmd=" ".join(cmd))
     return subprocess.run(cmd, cwd=ROOT, check=True, text=True, capture_output=False)
