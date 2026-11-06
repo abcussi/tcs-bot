@@ -45,4 +45,4 @@ Resolution notes (developer, 2026-11-06) — tests: `tests/unit/test_architect_r
   forces all. No new repository method needed (re-saved with `save_chunks`, one tx per document).
 - [x] QA bug: whitespace-only document left an orphan `vendor_documents` row -> validated before insert
       (`test_rejected_empty_document_leaves_no_row` xfail removed).
-- [x] `AppError` hierarchy moved to `vendor_risk_ai/errors.py` (re-exported by `api.errors`).
+- [x] `AppError` hierarchy moved to `tcs_bot/errors.py` (re-exported by `api.errors`).

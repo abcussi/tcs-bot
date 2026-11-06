@@ -9,8 +9,8 @@ WORKDIR /app
 # dependency layer: the workspace root must exist for uv to resolve the lockfile
 COPY pyproject.toml uv.lock ./
 COPY crawler/pyproject.toml crawler/pyproject.toml
-RUN mkdir -p src/vendor_risk_ai crawler/src/gfinance_crawler \
- && touch src/vendor_risk_ai/__init__.py crawler/src/gfinance_crawler/__init__.py \
+RUN mkdir -p src/tcs_bot crawler/src/gfinance_crawler \
+ && touch src/tcs_bot/__init__.py crawler/src/gfinance_crawler/__init__.py \
  && uv sync --frozen --no-dev --package gfinance-crawler --no-install-workspace
 # application layer: only the crawler package is installed into the venv
 COPY crawler ./crawler

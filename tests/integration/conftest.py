@@ -9,13 +9,13 @@ from typing import Any
 
 import pytest
 
-from vendor_risk_ai.config import get_settings
+from tcs_bot.config import get_settings
 
 
 def _reset_singletons() -> None:
-    from vendor_risk_ai.cache.cache import reset_cache
-    from vendor_risk_ai.db.mysql import reset_pool
-    from vendor_risk_ai.search.elastic import reset_es
+    from tcs_bot.cache.cache import reset_cache
+    from tcs_bot.db.mysql import reset_pool
+    from tcs_bot.search.elastic import reset_es
 
     reset_pool()
     reset_es()
@@ -32,9 +32,9 @@ def live_stack() -> Iterator[dict[str, Any]]:
         get_settings.cache_clear()
         _reset_singletons()
 
-        from vendor_risk_ai.db.mysql import ping as mysql_ping
-        from vendor_risk_ai.search.elastic import get_es
-        from vendor_risk_ai.search.elastic import ping as es_ping
+        from tcs_bot.db.mysql import ping as mysql_ping
+        from tcs_bot.search.elastic import get_es
+        from tcs_bot.search.elastic import ping as es_ping
 
         if not mysql_ping():
             pytest.skip("MySQL not reachable")

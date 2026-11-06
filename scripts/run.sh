@@ -10,5 +10,5 @@ uv sync --quiet
 case "${1:-all}" in
   test)   uv run pytest tests/unit crawler/tests -q ;;
   docker) docker compose --profile app up -d --build ;;
-  *)      uv run vendor-risk-ai "${1:-all}" ;;
+  *)      uv run tcs-bot "${1:-all}" ;;
 esac

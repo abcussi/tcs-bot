@@ -13,15 +13,15 @@ from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.config import Settings
-from vendor_risk_ai.llm import chain as chain_mod
-from vendor_risk_ai.llm.chain import FAKE_MODEL, build_report_chain, report_model_id
-from vendor_risk_ai.rag.embeddings import HashEmbedder
-from vendor_risk_ai.schemas.api import ReportRequest
-from vendor_risk_ai.schemas.domain import ChunkRecord, DocumentCreate, Vendor
-from vendor_risk_ai.schemas.report import RiskReport
-from vendor_risk_ai.search import elastic
-from vendor_risk_ai.services.report_service import ReportService, report_cache_key
+from tcs_bot.config import Settings
+from tcs_bot.llm import chain as chain_mod
+from tcs_bot.llm.chain import FAKE_MODEL, build_report_chain, report_model_id
+from tcs_bot.rag.embeddings import HashEmbedder
+from tcs_bot.schemas.api import ReportRequest
+from tcs_bot.schemas.domain import ChunkRecord, DocumentCreate, Vendor
+from tcs_bot.schemas.report import RiskReport
+from tcs_bot.search import elastic
+from tcs_bot.services.report_service import ReportService, report_cache_key
 
 from .conftest import CLEAN_DOC, GOING_CONCERN_DOC, FakeDocumentRepo, FakeIndexer, InMemoryCache
 from .test_ai_chain import _walk
@@ -217,7 +217,7 @@ def test_build_default_service_wires_strict_quote_lookup() -> None:
     """Constitution §6: the real wiring uses the raising quote lookup."""
     import inspect
 
-    from vendor_risk_ai.services import report_service
+    from tcs_bot.services import report_service
 
     src = inspect.getsource(report_service.build_default_service)
     assert "quote_lookup=latest_quote_strict" in src
@@ -294,8 +294,8 @@ def test_config_warns_on_temperature_or_model_drift() -> None:
 # ----------------------------------------------------------------------------- 11. errors
 def test_errors_live_in_neutral_module_and_are_reexported() -> None:
     """AC-003.1 / constitution §8: AppError hierarchy importable without FastAPI handlers."""
-    from vendor_risk_ai import errors
-    from vendor_risk_ai.api import errors as api_errors
+    from tcs_bot import errors
+    from tcs_bot.api import errors as api_errors
 
     for name in (
         "AppError",
@@ -316,7 +316,7 @@ def test_errors_live_in_neutral_module_and_are_reexported() -> None:
 # ----------------------------------------------------------------------------- QA: empty doc
 def test_empty_document_rejected_before_persisting(service: ReportService) -> None:
     """AC-003.2 / constitution §5: whitespace-only content -> 422 and no document row."""
-    from vendor_risk_ai.errors import ValidationAppError
+    from tcs_bot.errors import ValidationAppError
 
     with pytest.raises(ValidationAppError) as ei:
         service.ingest_document(1, DocumentCreate(title="t", content=" \n\t ​ "))

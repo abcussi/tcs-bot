@@ -48,7 +48,7 @@ mcp_server/server.py  mcp = FastMCP("vendor-risk"); generate_vendor_risk_report(
 - Stored embeddings with a different `embedding_model` are ignored and re-embedded (hash vs OpenAI
   vectors share dim 1536 but are not comparable).
 - Lookup by `vendor_name`: exact name/external_id, then unique partial match; ambiguous -> 422 `ambiguous_vendor`.
-- `AppError` and subclasses live in the neutral `vendor_risk_ai/errors.py` (used by `services/`,
+- `AppError` and subclasses live in the neutral `tcs_bot/errors.py` (used by `services/`,
   `ingestion/`, `mcp_server/`); `api/errors.py` re-exports them and owns the FastAPI handlers.
 - Retrieval never queries ES `vendor-chunks`: it is a write-only mirror (numpy cosine over
   MySQL-stored chunks is the retrieval path, constitution §3). ES down therefore only affects quotes.

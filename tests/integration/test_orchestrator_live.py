@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-from vendor_risk_ai import main as main_mod
-from vendor_risk_ai.db.mysql import transaction
-from vendor_risk_ai.services.report_service import ReportService
+from tcs_bot import main as main_mod
+from tcs_bot.db.mysql import transaction
+from tcs_bot.services.report_service import ReportService
 
 pytestmark = pytest.mark.integration
 
@@ -42,8 +42,8 @@ def _es_chunk_count(live_stack: dict[str, Any]) -> int:
 @pytest.fixture
 def spies(live_stack, monkeypatch) -> dict[str, list[Any]]:
     """Record the return values of the functions behind each orchestrator step."""
-    from vendor_risk_ai.db import migrate as migrate_mod
-    from vendor_risk_ai.db import seed as seed_mod
+    from tcs_bot.db import migrate as migrate_mod
+    from tcs_bot.db import seed as seed_mod
 
     monkeypatch.chdir(ROOT)  # SEED_FILE is relative to the repo root
     calls: dict[str, list[Any]] = {"migrate": [], "seed": [], "index": []}
@@ -69,7 +69,7 @@ def spies(live_stack, monkeypatch) -> dict[str, list[Any]]:
 
 
 def test_migrate_step_is_idempotent(spies):
-    """AC-001.4, AC-004.2: `vendor-risk-ai migrate` on a migrated DB is a no-op."""
+    """AC-001.4, AC-004.2: `tcs-bot migrate` on a migrated DB is a no-op."""
     before = _counts()
     assert main_mod.main(["migrate"]) == 0
     assert main_mod.main(["migrate"]) == 0

@@ -7,7 +7,7 @@
 ## Open (architect review 2026-11-06)
 - [x] BLOCKER `docker-compose.yml:37`: ES healthcheck `curl ...health?wait_for_status=yellow&timeout=5s`
       is unquoted inside `sh -c`, so `&` backgrounds curl and the check always exits 0 (verified).
-      ES is "healthy" before it listens -> api CMD `vendor-risk-ai index` -> `ensure_indices()` raises
+      ES is "healthy" before it listens -> api CMD `tcs-bot index` -> `ensure_indices()` raises
       -> api container exits (no restart policy). Fix: quote the URL
       (`curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s'`).
 - [x] `docker-compose.yml` api: add `restart: on-failure` and pin in-network `MYSQL_PORT: "3306"`

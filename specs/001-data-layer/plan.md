@@ -10,22 +10,22 @@
 
 ## Public API
 ```python
-# vendor_risk_ai/db/mysql.py
+# tcs_bot/db/mysql.py
 def get_pool() -> MySQLConnectionPool            # lazily created singleton from settings
 def reset_pool() -> None                           # tests
 @contextmanager
 def transaction() -> Iterator[MySQLCursorDict]    # dictionary cursor; commit/rollback; returns conn
 def ping() -> bool
 
-# vendor_risk_ai/db/migrate.py
+# tcs_bot/db/migrate.py
 def migrate() -> list[str]                         # returns tables created this run
 
-# vendor_risk_ai/db/seed.py
+# tcs_bot/db/seed.py
 BUILTIN_SEED: dict                                 # synthetic fallback
 def load_seed_data(path: str | None = None) -> dict
 def seed(path: str | None = None) -> dict[str, int]   # {"vendors": n, "documents": m}
 
-# vendor_risk_ai/db/repositories.py  (all use transaction())
+# tcs_bot/db/repositories.py  (all use transaction())
 class VendorRepository:
     def list(self, limit: int = 100, offset: int = 0) -> list[Vendor]
     def get(self, vendor_id: int) -> Vendor | None
@@ -41,7 +41,7 @@ class ReportRepository:
     def save(self, vendor_id: int, report: RiskReport, model: str) -> int
     def latest(self, vendor_id: int) -> StoredReport | None
 
-# vendor_risk_ai/cache/cache.py
+# tcs_bot/cache/cache.py
 class TwoTierCache:
     def __init__(self, redis_url: str | None, ttl: int, maxsize: int)
     def get(self, key: str) -> Any | None          # JSON-serializable values
@@ -50,7 +50,7 @@ class TwoTierCache:
     def get_or_set(self, key: str, factory: Callable[[], Any], ttl: int | None = None) -> Any
 def get_cache() -> TwoTierCache
 
-# vendor_risk_ai/search/elastic.py
+# tcs_bot/search/elastic.py
 def get_es() -> Elasticsearch
 def ensure_indices() -> None
 def index_chunks(vendor_id: int, chunks: list[ChunkRecord]) -> int

@@ -37,13 +37,13 @@ def test_quote_doc_id_is_per_minute() -> None:
 
 
 def test_crawler_does_not_import_main_app() -> None:
-    """AC-002.1 gfinance_crawler is standalone (never imports vendor_risk_ai)."""
+    """AC-002.1 gfinance_crawler is standalone (never imports tcs_bot)."""
     import pathlib
     import re
 
     import gfinance_crawler
 
     pkg = pathlib.Path(gfinance_crawler.__file__).parent
-    pattern = re.compile(r"^\s*(from|import)\s+vendor_risk_ai", re.MULTILINE)
+    pattern = re.compile(r"^\s*(from|import)\s+tcs_bot", re.MULTILINE)
     for source in pkg.glob("*.py"):
         assert not pattern.search(source.read_text()), source.name

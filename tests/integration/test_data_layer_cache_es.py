@@ -13,10 +13,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.cache.cache import TwoTierCache
-from vendor_risk_ai.config import get_settings
-from vendor_risk_ai.schemas.domain import ChunkRecord
-from vendor_risk_ai.search import elastic
+from tcs_bot.cache.cache import TwoTierCache
+from tcs_bot.config import get_settings
+from tcs_bot.schemas.domain import ChunkRecord
+from tcs_bot.search import elastic
 
 pytestmark = pytest.mark.integration
 

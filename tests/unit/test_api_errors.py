@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from vendor_risk_ai.api.errors import (
+from tcs_bot.api.errors import (
     AppError,
     DependencyUnavailable,
     NotFoundError,
@@ -94,7 +94,7 @@ def test_report_request_requires_vendor_selector() -> None:
     import pytest
     from pydantic import ValidationError
 
-    from vendor_risk_ai.schemas.api import ReportRequest
+    from tcs_bot.schemas.api import ReportRequest
 
     with pytest.raises(ValidationError):
         ReportRequest()

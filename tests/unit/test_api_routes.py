@@ -8,10 +8,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from vendor_risk_ai.api.app import create_app
-from vendor_risk_ai.api.errors import NotFoundError
-from vendor_risk_ai.schemas.report import RiskReport
-from vendor_risk_ai.services.report_service import ReportService
+from tcs_bot.api.app import create_app
+from tcs_bot.api.errors import NotFoundError
+from tcs_bot.schemas.report import RiskReport
+from tcs_bot.services.report_service import ReportService
 
 from .conftest import GOING_CONCERN_DOC
 
@@ -145,7 +145,7 @@ def test_lifespan_builds_default_service(
     monkeypatch: pytest.MonkeyPatch, service: ReportService
 ) -> None:
     """AC-003.7: create_app() without a service builds it lazily at startup."""
-    import vendor_risk_ai.services.report_service as rs
+    import tcs_bot.services.report_service as rs
 
     monkeypatch.setattr(rs, "build_default_service", lambda: service)
     app = create_app(health_checks=HEALTHY)

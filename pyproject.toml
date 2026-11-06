@@ -1,5 +1,5 @@
 [project]
-name = "vendor-risk-ai"
+name = "tcs-bot"
 version = "0.1.0"
 description = "AI-based vendor risk assessment report generator for capital markets (FastAPI + LCEL + MCP)"
 authors = [{ name = "Angel Benjamin Cussi" }]
@@ -30,8 +30,8 @@ dependencies = [
 ]
 
 [project.scripts]
-vendor-risk-ai = "vendor_risk_ai.main:cli"
-vendor-risk-mcp = "vendor_risk_ai.mcp_server.server:main"
+tcs-bot = "tcs_bot.main:cli"
+tcs-bot-mcp = "tcs_bot.mcp_server.server:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]

@@ -10,18 +10,18 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from vendor_risk_ai.config import Settings
-from vendor_risk_ai.llm import chain as chain_mod
-from vendor_risk_ai.llm.chain import (
+from tcs_bot.config import Settings
+from tcs_bot.llm import chain as chain_mod
+from tcs_bot.llm.chain import (
     FAKE_MODEL,
     build_report_chain,
     build_report_chain_with_parser,
     finalize_report,
     format_inputs,
 )
-from vendor_risk_ai.llm.prompts import SYSTEM_PROMPT, build_prompt
-from vendor_risk_ai.schemas.domain import ChunkRecord, Vendor
-from vendor_risk_ai.schemas.report import RiskReport, score_to_level
+from tcs_bot.llm.prompts import SYSTEM_PROMPT, build_prompt
+from tcs_bot.schemas.domain import ChunkRecord, Vendor
+from tcs_bot.schemas.report import RiskReport, score_to_level
 
 from .conftest import CLEAN_DOC, GOING_CONCERN_DOC
 

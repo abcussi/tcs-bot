@@ -8,7 +8,7 @@ from __future__ import annotations
 from gfinance_crawler import sink as crawler_sink
 from gfinance_crawler.models import Quote
 
-from vendor_risk_ai.search import elastic
+from tcs_bot.search import elastic
 
 
 def test_quotes_mapping_identical_in_crawler_and_app() -> None:

@@ -21,7 +21,7 @@ Notes
 - [x] `sink.py:48` create the index with `settings={"number_of_shards": 1, "number_of_replicas": 0}`
       (today a crawler-first create gives 1 replica -> yellow on single-node ES).
 - [x] Contract test in `tests/unit` asserting `gfinance_crawler.sink.QUOTES_MAPPING ==
-      vendor_risk_ai.search.elastic.QUOTES_MAPPING` and `set(Quote.model_fields) == mapping props`.
+      tcs_bot.search.elastic.QUOTES_MAPPING` and `set(Quote.model_fields) == mapping props`.
 - [x] `crawler/Dockerfile:22-23`: per-arch supercronic checksum (amd64/arm64) instead of a single
       SHA1 that breaks BuildKit builds on arm64 (TARGETARCH=arm64 downloads the arm64 binary).
 

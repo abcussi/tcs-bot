@@ -33,7 +33,7 @@ QUOTES_MAPPING: dict[str, Any] = {
     }
 }
 
-# Must match ``vendor_risk_ai.search.elastic._INDEX_SETTINGS``: whichever process creates
+# Must match ``tcs_bot.search.elastic._INDEX_SETTINGS``: whichever process creates
 # ``market-quotes`` first wins (single-node ES -> 0 replicas, otherwise the index is yellow).
 QUOTES_INDEX_SETTINGS: dict[str, Any] = {"number_of_shards": 1, "number_of_replicas": 0}
 

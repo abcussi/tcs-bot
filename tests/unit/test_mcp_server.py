@@ -6,10 +6,10 @@ from collections.abc import Iterator
 
 import pytest
 
-from vendor_risk_ai.mcp_server import server
-from vendor_risk_ai.schemas.domain import DocumentCreate
-from vendor_risk_ai.schemas.report import RiskReport
-from vendor_risk_ai.services.report_service import ReportService
+from tcs_bot.mcp_server import server
+from tcs_bot.schemas.domain import DocumentCreate
+from tcs_bot.schemas.report import RiskReport
+from tcs_bot.services.report_service import ReportService
 
 from .conftest import GOING_CONCERN_DOC
 

@@ -2,7 +2,7 @@
   "mcpServers": {
     "vendor-risk": {
       "command": "uv",
-      "args": ["run", "vendor-risk-mcp"]
+      "args": ["run", "tcs-bot-mcp"]
     }
   }
 }

@@ -1,4 +1,4 @@
-"""Crawler settings (env / .env driven). Never imports vendor_risk_ai."""
+"""Crawler settings (env / .env driven). Never imports tcs_bot."""
 
 from __future__ import annotations
 

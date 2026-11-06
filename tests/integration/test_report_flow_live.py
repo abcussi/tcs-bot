@@ -14,12 +14,12 @@ from typing import Any
 
 import pytest
 
-from vendor_risk_ai.db.mysql import transaction
-from vendor_risk_ai.schemas.api import ReportRequest
-from vendor_risk_ai.schemas.domain import DocumentCreate
-from vendor_risk_ai.schemas.report import RiskReport, score_to_level
-from vendor_risk_ai.search.elastic import chunk_doc_id
-from vendor_risk_ai.services.report_service import ReportService, build_default_service
+from tcs_bot.db.mysql import transaction
+from tcs_bot.schemas.api import ReportRequest
+from tcs_bot.schemas.domain import DocumentCreate
+from tcs_bot.schemas.report import RiskReport, score_to_level
+from tcs_bot.search.elastic import chunk_doc_id
+from tcs_bot.services.report_service import ReportService, build_default_service
 
 pytestmark = pytest.mark.integration
 
@@ -100,7 +100,7 @@ def _vendor_id(ext: str) -> int:
         cur.execute("SELECT id FROM vendors WHERE external_id = %s", (ext,))
         row = cur.fetchone()
     if not row:
-        pytest.skip(f"seed vendor {ext} missing (run `uv run vendor-risk-ai seed`)")
+        pytest.skip(f"seed vendor {ext} missing (run `uv run tcs-bot seed`)")
     return int(row["id"])
 
 
@@ -254,7 +254,7 @@ def test_market_quote_enrichment(live_stack, service, cleanup):
 
 def test_rejected_empty_document_leaves_no_row(live_stack, service, cleanup):
     """AC-003.2, constitution §5: a document rejected as empty must not be persisted."""
-    from vendor_risk_ai.api.errors import ValidationAppError
+    from tcs_bot.api.errors import ValidationAppError
 
     svc, _ = service
     vendor_id = _vendor_id(FLOW_VENDOR_EXT)

@@ -8,8 +8,8 @@ WORKDIR /app
 # dependency layer (cached until the lockfile changes)
 COPY pyproject.toml uv.lock ./
 COPY crawler/pyproject.toml crawler/pyproject.toml
-RUN mkdir -p src/vendor_risk_ai crawler/src/gfinance_crawler \
- && touch src/vendor_risk_ai/__init__.py crawler/src/gfinance_crawler/__init__.py \
+RUN mkdir -p src/tcs_bot crawler/src/gfinance_crawler \
+ && touch src/tcs_bot/__init__.py crawler/src/gfinance_crawler/__init__.py \
  && uv sync --frozen --no-dev --no-install-workspace
 # application layer
 COPY src ./src
@@ -30,4 +30,4 @@ USER app
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 CMD curl -fs http://localhost:8000/health || exit 1
 # migrate + seed + index are idempotent, then serve
-CMD ["sh", "-c", "vendor-risk-ai migrate && vendor-risk-ai seed && vendor-risk-ai index && vendor-risk-ai api"]
+CMD ["sh", "-c", "tcs-bot migrate && tcs-bot seed && tcs-bot index && tcs-bot api"]

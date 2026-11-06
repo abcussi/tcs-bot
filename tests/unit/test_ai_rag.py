@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from vendor_risk_ai.config import Settings
-from vendor_risk_ai.rag.embeddings import Embedder, HashEmbedder, OpenAIEmbedder, get_embedder
-from vendor_risk_ai.rag.retriever import Retriever, cosine_top_k
-from vendor_risk_ai.schemas.domain import ChunkRecord
+from tcs_bot.config import Settings
+from tcs_bot.rag.embeddings import Embedder, HashEmbedder, OpenAIEmbedder, get_embedder
+from tcs_bot.rag.retriever import Retriever, cosine_top_k
+from tcs_bot.schemas.domain import ChunkRecord
 
 
 # ----------------------------------------------------------------------------- cosine_top_k

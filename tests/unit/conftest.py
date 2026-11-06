@@ -11,15 +11,15 @@ from typing import Any
 
 import pytest
 
-from vendor_risk_ai.config import Settings, get_settings
-from vendor_risk_ai.schemas.domain import (
+from tcs_bot.config import Settings, get_settings
+from tcs_bot.schemas.domain import (
     ChunkRecord,
     DocumentCreate,
     Vendor,
     VendorCreate,
     VendorDocument,
 )
-from vendor_risk_ai.schemas.report import RiskReport, StoredReport
+from tcs_bot.schemas.report import RiskReport, StoredReport
 
 GOING_CONCERN_DOC = (
     "Annual report FY2025. The company reported a net loss of $48 million and negative operating "
@@ -257,9 +257,9 @@ def indexer() -> FakeIndexer:
 def service(
     vendor_repo: FakeVendorRepo, quotes: FakeQuotes, indexer: FakeIndexer, settings: Settings
 ):
-    from vendor_risk_ai.llm.chain import build_report_chain
-    from vendor_risk_ai.rag.embeddings import HashEmbedder
-    from vendor_risk_ai.services.report_service import ReportService
+    from tcs_bot.llm.chain import build_report_chain
+    from tcs_bot.rag.embeddings import HashEmbedder
+    from tcs_bot.services.report_service import ReportService
 
     return ReportService(
         vendors=vendor_repo,

@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 from langchain_core.runnables import RunnableLambda
 
-from vendor_risk_ai.api.errors import (
+from tcs_bot.api.errors import (
     DependencyUnavailable,
     NotFoundError,
     UpstreamError,
     ValidationAppError,
 )
-from vendor_risk_ai.schemas.api import ReportRequest
-from vendor_risk_ai.schemas.domain import DocumentCreate
-from vendor_risk_ai.services.report_service import ReportService, report_cache_key
+from tcs_bot.schemas.api import ReportRequest
+from tcs_bot.schemas.domain import DocumentCreate
+from tcs_bot.services.report_service import ReportService, report_cache_key
 
 from .conftest import CLEAN_DOC, GOING_CONCERN_DOC, FakeIndexer, FakeQuotes, InMemoryCache
 

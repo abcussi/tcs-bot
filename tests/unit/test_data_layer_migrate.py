@@ -8,8 +8,8 @@ import pytest
 from mysql.connector import errors as mysql_errors
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.db import migrate as migrate_mod
-from vendor_risk_ai.db import mysql as mysql_mod
+from tcs_bot.db import migrate as migrate_mod
+from tcs_bot.db import mysql as mysql_mod
 
 TABLES = [name for name, _ in migrate_mod.load_statements()]
 

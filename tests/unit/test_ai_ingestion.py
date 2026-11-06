@@ -6,11 +6,11 @@ import io
 
 import pytest
 
-from vendor_risk_ai.api.errors import ValidationAppError
-from vendor_risk_ai.ingestion import extract as extract_mod
-from vendor_risk_ai.ingestion.chunker import chunk_text
-from vendor_risk_ai.ingestion.extract import extract_document, extract_text
-from vendor_risk_ai.ingestion.normalize import normalize_text
+from tcs_bot.api.errors import ValidationAppError
+from tcs_bot.ingestion import extract as extract_mod
+from tcs_bot.ingestion.chunker import chunk_text
+from tcs_bot.ingestion.extract import extract_document, extract_text
+from tcs_bot.ingestion.normalize import normalize_text
 
 
 # ----------------------------------------------------------------------------- extract

@@ -12,9 +12,9 @@ import pytest
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
+from tcs_bot.schemas.api import DocumentOut, ErrorEnvelope, HealthOut, VendorOut
+from tcs_bot.schemas.report import RiskReport, score_to_level
 from tests.e2e.conftest import E2E_SOURCE
-from vendor_risk_ai.schemas.api import DocumentOut, ErrorEnvelope, HealthOut, VendorOut
-from vendor_risk_ai.schemas.report import RiskReport, score_to_level
 
 pytestmark = pytest.mark.e2e
 
@@ -77,7 +77,7 @@ def assert_report(resp: httpx.Response, vendor_id: int) -> RiskReport:
 def vendor(api: httpx.Client) -> VendorOut:
     vendors = [VendorOut.model_validate(v) for v in api.get("/vendors").json()]
     if not vendors:
-        pytest.skip("no vendors seeded (run `uv run vendor-risk-ai seed`)")
+        pytest.skip("no vendors seeded (run `uv run tcs-bot seed`)")
     by_ext = {v.external_id: v for v in vendors}
     return by_ext.get(E2E_VENDOR_EXT, vendors[0])
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 import redis
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.cache import cache as cache_mod
-from vendor_risk_ai.cache.cache import TwoTierCache
+from tcs_bot.cache import cache as cache_mod
+from tcs_bot.cache.cache import TwoTierCache
 
 
 class FakeClock:

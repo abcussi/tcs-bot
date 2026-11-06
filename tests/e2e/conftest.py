@@ -32,7 +32,7 @@ def api() -> Iterator[httpx.Client]:
 
 def _db_available() -> bool:
     try:
-        from vendor_risk_ai.db.mysql import ping
+        from tcs_bot.db.mysql import ping
 
         return bool(ping())
     except Exception:
@@ -40,7 +40,7 @@ def _db_available() -> bool:
 
 
 def _max_id(table: str) -> int:
-    from vendor_risk_ai.db.mysql import transaction
+    from tcs_bot.db.mysql import transaction
 
     with transaction() as cur:
         cur.execute(f"SELECT COALESCE(MAX(id), 0) AS m FROM {table}")
@@ -64,12 +64,12 @@ def created() -> Iterator[dict[str, Any]]:
     yield track
     if not can_clean:
         return
-    from vendor_risk_ai.config import get_settings
-    from vendor_risk_ai.db.mysql import transaction
+    from tcs_bot.config import get_settings
+    from tcs_bot.db.mysql import transaction
 
     s = get_settings()
     try:
-        from vendor_risk_ai.search.elastic import get_es
+        from tcs_bot.search.elastic import get_es
 
         es = get_es()
         es.indices.refresh(index=s.elastic_chunks_index)  # chunks are indexed without refresh

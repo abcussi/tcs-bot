@@ -1,4 +1,4 @@
-# Vendor Risk AI
+# TCS Bot — Vendor Risk AI
 
 AI-based **vendor risk assessment report generator for capital markets**.
 Ingests vendor financial reports, news and regulatory filings (text/PDF), retrieves the relevant
@@ -29,7 +29,7 @@ comes from a **Google Finance crawler** (cron) that indexes quotes into **Elasti
 ```bash
 cp .env.example .env              # set OPENAI_API_KEY (or LLM_PROVIDER=fake to run offline)
 uv sync
-uv run vendor-risk-ai all         # docker compose up mysql/redis/es -> migrate -> seed -> index -> crawl -> API
+uv run tcs-bot all         # docker compose up mysql/redis/es -> migrate -> seed -> index -> crawl -> API
 ```
 Open http://localhost:8000/docs. Generate a report:
 ```bash
@@ -44,16 +44,16 @@ docker compose --profile app up -d --build
 ### Steps
 | Command | What it does |
 |---|---|
-| `vendor-risk-ai up` / `down` / `status` | Start/stop MySQL, Redis, Elasticsearch via Docker Compose and wait for health |
-| `vendor-risk-ai migrate` | Create all tables (tracked in `schema_migrations`; compensating rollback on failure) |
-| `vendor-risk-ai seed` | Load `data/seed/vendors.json`; falls back to built-in synthetic seed if missing |
-| `vendor-risk-ai index` | Ensure ES indices; chunk + embed + index every un-embedded document |
-| `vendor-risk-ai crawl` | One crawler run (non-fatal) |
-| `vendor-risk-ai api` / `mcp` | Serve FastAPI / MCP (stdio) |
+| `tcs-bot up` / `down` / `status` | Start/stop MySQL, Redis, Elasticsearch via Docker Compose and wait for health |
+| `tcs-bot migrate` | Create all tables (tracked in `schema_migrations`; compensating rollback on failure) |
+| `tcs-bot seed` | Load `data/seed/vendors.json`; falls back to built-in synthetic seed if missing |
+| `tcs-bot index` | Ensure ES indices; chunk + embed + index every un-embedded document |
+| `tcs-bot crawl` | One crawler run (non-fatal) |
+| `tcs-bot api` / `mcp` | Serve FastAPI / MCP (stdio) |
 
 ### MCP
 `.mcp.json` registers the server for Claude Code and other MCP clients:
-`uv run vendor-risk-mcp` (stdio) or `uv run vendor-risk-mcp --transport streamable-http --port 8001`.
+`uv run tcs-bot-mcp` (stdio) or `uv run tcs-bot-mcp --transport streamable-http --port 8001`.
 Tools: `generate_vendor_risk_report`, `list_vendors`.
 
 ## Development (spec-driven)
@@ -63,7 +63,7 @@ Shared AI context for all models: [`AGENTS.md`](AGENTS.md). Claude subagents: `.
 
 ```bash
 uv run pytest tests/unit crawler/tests     # offline
-uv run pytest -m integration               # needs `vendor-risk-ai up`
+uv run pytest -m integration               # needs `tcs-bot up`
 uv run pytest -m e2e
 uv run ruff check .
 ```

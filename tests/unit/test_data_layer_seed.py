@@ -8,8 +8,8 @@ from pathlib import Path
 
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.db import seed as seed_mod
-from vendor_risk_ai.db.seed import BUILTIN_SEED, load_seed_data
+from tcs_bot.db import seed as seed_mod
+from tcs_bot.db.seed import BUILTIN_SEED, load_seed_data
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

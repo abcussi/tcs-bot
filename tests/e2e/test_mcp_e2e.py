@@ -1,4 +1,4 @@
-"""E2E: launch `uv run vendor-risk-mcp` over stdio with the MCP client SDK and call its tools."""
+"""E2E: launch `uv run tcs-bot-mcp` over stdio with the MCP client SDK and call its tools."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from vendor_risk_ai.schemas.api import VendorOut
-from vendor_risk_ai.schemas.report import RiskReport, score_to_level
+from tcs_bot.schemas.api import VendorOut
+from tcs_bot.schemas.report import RiskReport, score_to_level
 
 pytestmark = pytest.mark.e2e
 
@@ -48,7 +48,7 @@ def server_params(api) -> StdioServerParameters:
         pytest.skip("uv not on PATH")
     env = {**os.environ, "LLM_PROVIDER": "fake", "OPENAI_API_KEY": "", "LOG_LEVEL": "WARNING"}
     return StdioServerParameters(
-        command="uv", args=["run", "--no-sync", "vendor-risk-mcp"], cwd=str(ROOT), env=env
+        command="uv", args=["run", "--no-sync", "tcs-bot-mcp"], cwd=str(ROOT), env=env
     )
 
 

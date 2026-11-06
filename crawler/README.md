@@ -2,7 +2,7 @@
 
 Scrapes Google Finance quote pages (`{CRAWLER_BASE_URL}/{TICKER}:{EXCHANGE}`) for every
 `CRAWLER_TICKERS` entry and bulk-indexes them into Elasticsearch (`ELASTIC_QUOTES_INDEX`,
-default `market-quotes`). Spec: `specs/002-market-crawler/`. Never imports `vendor_risk_ai`.
+default `market-quotes`). Spec: `specs/002-market-crawler/`. Never imports `tcs_bot`.
 
 ```bash
 uv run gfinance-crawl --once        # crawl once, log + return {fetched, parsed, indexed, failed}

@@ -13,20 +13,20 @@ from datetime import date
 import pytest
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.config import get_settings
-from vendor_risk_ai.db import migrate as migrate_mod
-from vendor_risk_ai.db import mysql as mysql_mod
-from vendor_risk_ai.db.migrate import migrate
-from vendor_risk_ai.db.mysql import ping, transaction
-from vendor_risk_ai.db.repositories import (
+from tcs_bot.config import get_settings
+from tcs_bot.db import migrate as migrate_mod
+from tcs_bot.db import mysql as mysql_mod
+from tcs_bot.db.migrate import migrate
+from tcs_bot.db.mysql import ping, transaction
+from tcs_bot.db.repositories import (
     DocumentRepository,
     ReportRepository,
     VendorRepository,
     content_sha256,
 )
-from vendor_risk_ai.db.seed import seed
-from vendor_risk_ai.schemas.domain import ChunkRecord, DocumentCreate, VendorCreate
-from vendor_risk_ai.schemas.report import FinancialHealth, RedFlag, RiskReport
+from tcs_bot.db.seed import seed
+from tcs_bot.schemas.domain import ChunkRecord, DocumentCreate, VendorCreate
+from tcs_bot.schemas.report import FinancialHealth, RedFlag, RiskReport
 
 pytestmark = pytest.mark.integration
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vendor_risk_ai import main as main_mod
+from tcs_bot import main as main_mod
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -124,5 +124,5 @@ def test_run_script_wraps_cli():
     assert script.is_file() and os.access(script, os.X_OK)
     text = script.read_text()
     assert text.startswith("#!")
-    assert "uv run vendor-risk-ai" in text
+    assert "uv run tcs-bot" in text
     assert "set -euo pipefail" in text

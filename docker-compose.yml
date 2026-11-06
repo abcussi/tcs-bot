@@ -1,4 +1,4 @@
-name: vendor-risk-ai
+name: tcs-bot
 
 services:
   mysql:

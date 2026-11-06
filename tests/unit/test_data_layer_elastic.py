@@ -5,8 +5,8 @@ from __future__ import annotations
 from elastic_transport import ConnectionError as TransportConnectionError
 from structlog.testing import capture_logs
 
-from vendor_risk_ai.schemas.domain import ChunkRecord
-from vendor_risk_ai.search import elastic
+from tcs_bot.schemas.domain import ChunkRecord
+from tcs_bot.search import elastic
 
 
 class FakeIndices:

@@ -22,10 +22,10 @@ Market context (quotes) is scraped from Google Finance by a separate cron crawle
 
 ## 3. Layout
 ```
-src/vendor_risk_ai/
+src/tcs_bot/
   config.py            Settings (pydantic-settings, reads .env) -> get_settings()
   errors.py            AppError hierarchy (framework-neutral; re-exported by api/errors.py)
-  main.py              CLI orchestrator: `uv run vendor-risk-ai all` boots everything
+  main.py              CLI orchestrator: `uv run tcs-bot all` boots everything
   api/                 FastAPI app factory, routes, custom errors + handlers, deps
   schemas/             Pydantic I/O models (api.py, report.py, domain.py)
   db/                  MySQL connection pool, transaction(), schema.sql, migrate, seed, repositories
@@ -46,11 +46,11 @@ docker-compose.yml     mysql, redis, elasticsearch, api, crawler
 ## 4. Commands
 ```bash
 uv sync                                   # install (workspace incl. crawler)
-uv run vendor-risk-ai all                 # compose up infra -> migrate -> seed -> index -> crawl -> API
-uv run vendor-risk-ai up|down|status|migrate|seed|index|crawl|api|mcp
-uv run vendor-risk-ai all --no-infra      # same pipeline, infra already running
+uv run tcs-bot all                 # compose up infra -> migrate -> seed -> index -> crawl -> API
+uv run tcs-bot up|down|status|migrate|seed|index|crawl|api|mcp
+uv run tcs-bot all --no-infra      # same pipeline, infra already running
 uv run pytest tests/unit crawler/tests -m "not integration"   # fast, no infra
-uv run pytest -m integration              # needs `uv run vendor-risk-ai up`
+uv run pytest -m integration              # needs `uv run tcs-bot up`
 uv run pytest -m e2e                      # full stack
 uv run ruff check . && uv run ruff format --check .
 docker compose --profile app up -d --build   # everything in containers (api+crawler are in the `app` profile; needs .env)
@@ -70,7 +70,7 @@ docker compose --profile app up -d --build   # everything in containers (api+cra
 | Agent | Owns |
 |---|---|
 | `architect-reviewer` | Reviews architecture, contracts between modules, integration of features; edits specs, not code |
-| `developer` | Implements the monolithic app per specs (src/vendor_risk_ai) |
+| `developer` | Implements the monolithic app per specs (src/tcs_bot) |
 | `qa-engineer` | Unit, integration and e2e tests mapped to acceptance criteria |
 | `crawler-engineer` | `crawler/` package, scraping, ES sink, scheduling |
 
